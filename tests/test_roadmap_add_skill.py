@@ -24,14 +24,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from specfuse.loop import ids
+
 
 # ---------------------------------------------------------------------------
 # Reference implementation
 # ---------------------------------------------------------------------------
 
-FEAT_RE = re.compile(r"FEAT-(\d{4})-(\d{4})")
-FEAT_ROW_RE = re.compile(r"^\| (FEAT-\d{4}-\d{4})")
-PLAN_FEAT_RE = re.compile(r"^feature_id:\s*(FEAT-\d{4}-\d{4})")
+FEAT_RE = re.compile(ids.FEATURE_ID_PATTERN)
+FEAT_ROW_RE = re.compile(r"^\| (" + ids.FEATURE_ID_PATTERN + ")")
+PLAN_FEAT_RE = re.compile(r"^feature_id:\s*(" + ids.FEATURE_ID_PATTERN + ")")
 
 
 def scan_feat_ids(
@@ -1052,3 +1054,26 @@ class TestSkillDocumentsGitHubSource(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSkillAllocatesThroughIdsNext(unittest.TestCase):
+    """Local allocation is the `ids next` command's job, in both ID forms."""
+
+    def setUp(self):
+        repo_root = Path(__file__).resolve().parent.parent
+        self.skill = (
+            repo_root / "plugins" / "specfuse" / "skills"
+            / "roadmap-add" / "SKILL.md"
+        ).read_text()
+
+    def test_skill_names_the_ids_next_command(self):
+        self.assertIn("specfuse.loop.ids next", self.skill)
+
+    def test_row_and_anchor_examples_parse_in_both_forms(self):
+        matches = [FEAT_ROW_RE.match(ln) for ln in self.skill.splitlines()]
+        parsed = [ids.parse(m.group(1)) for m in matches if m]
+        self.assertTrue(any(p and p.key is None for p in parsed))
+        self.assertTrue(any(p and p.key for p in parsed))
+        for example in ("feat-2026-0003", "feat-acme-2026-0003"):
+            self.assertIn(f'<a id="{example}"></a>', self.skill)
+        self.assertEqual(ids.anchor("FEAT-ACME-2026-0003"), "feat-acme-2026-0003")

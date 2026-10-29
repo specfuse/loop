@@ -1,13 +1,14 @@
 ---
 name: roadmap-add
-description: "Append a new planned feature row + detail section to .specfuse/roadmap.md, auto-picking the next FEAT-YYYY-NNNN ID by scanning four sources (roadmap table, PLAN.md files, LEARNINGS/RETROSPECTIVE files, and GitHub issue/PR titles+bodies when reachable). Invoke on /roadmap-add (interactive) or /roadmap-add --id ... --title ... --slug ... --why ... --goal ... --benefits ... (headless)."
+description: "Append a new planned feature row + detail section to .specfuse/roadmap.md, auto-picking the next FEAT-YYYY-NNNN (or keyed FEAT-<KEY>-YYYY-NNNN) ID via `python3 -m specfuse.loop.ids next` plus the GitHub scan, checked against four sources (roadmap table, PLAN.md files, LEARNINGS/RETROSPECTIVE files, and GitHub issue/PR titles+bodies when reachable). Invoke on /roadmap-add (interactive) or /roadmap-add --id ... --title ... --slug ... --why ... --goal ... --benefits ... (headless)."
 ---
 
 # roadmap-add
 
 Appends one table row and one detail section for a new `planned` feature to
-`.specfuse/roadmap.md`. The next `FEAT-YYYY-NNNN` ID is computed automatically
-from four sources so that IDs reserved in comments, closed folders, or GitHub
+`.specfuse/roadmap.md`. The next `FEAT-YYYY-NNNN` ID — or `FEAT-<KEY>-YYYY-NNNN`
+when `ids.key` is set in `layout.yml` — is computed automatically
+(`specfuse.loop.ids next` for the local sources, plus the GitHub scan) so that IDs reserved in comments, closed folders, or GitHub
 issue/PR titles are not reused.
 
 ## When to invoke
@@ -59,17 +60,35 @@ Table row (the `Detail` cell links to the detail section's anchor):
 | <FEAT-YYYY-NNNN> | <title> | planned | — | [→ detail](#feat-yyyy-nnnn) |
 ```
 
+Concrete examples — unkeyed, then keyed (when `ids.key` is set the key is part
+of the ID and the anchor):
+
+```
+| FEAT-2026-0003 | <title> | planned | — | [→ detail](#feat-2026-0003) |
+| FEAT-ACME-2026-0003 | <title> | planned | — | [→ detail](#feat-acme-2026-0003) |
+```
+
 Anchor (its own line, immediately above the `## FEAT-…` heading):
 
 ```
 <a id="feat-yyyy-nnnn"></a>
 ```
 
+Concrete anchors — unkeyed, then keyed (write exactly one):
+
+```
+<a id="feat-2026-0003"></a>
+<a id="feat-acme-2026-0003"></a>
+```
+
 Detail section heading:
 
 ```
 ## <FEAT-YYYY-NNNN> — <title>
+## FEAT-ACME-2026-0003 — <title>
 ```
+
+(unkeyed, then keyed — write exactly one)
 
 In the anchor and the `Detail` cell's ref, replace `feat-yyyy-nnnn` with the
 **lower-cased** feature ID (`FEAT-2026-0003` → `feat-2026-0003`). Same strings
@@ -92,24 +111,30 @@ Detail section body (five blocks, blank line between each):
 ## Next-ID algorithm
 
 The next ID for the current calendar year is one greater than the highest
-`NNNN` found across **four sources**:
+`NNNN` found across **four sources**. Every pattern below accepts both forms:
+`FEAT-<YYYY>-<NNNN>` and keyed `FEAT-<KEY>-<YYYY>-<NNNN>`; the ordinal sequence
+is shared across them, so a keyed ID counts toward the maximum like an unkeyed one.
 
-### Source (a) — roadmap table rows
+### Sources (a) and (b) — run the command, do not re-derive
 
-Read `.specfuse/roadmap.md`. For every line that begins with
-`| FEAT-<YYYY>-<NNNN>` (a table data row), record the FEAT ID and its line number.
+Sources (a) (roadmap table rows) and (b) (`feature_id:` in feature `PLAN.md`
+files) are computed by one command:
 
-### Source (b) — feature PLAN.md files
+```
+python3 -m specfuse.loop.ids next
+```
 
-For every file matching `.specfuse/features/*/PLAN.md`, scan lines that match
-`^feature_id:\s*FEAT-<YYYY>-<NNNN>`. Record the FEAT ID and its file path + line
-number.
+It prints the next ID, already keyed when `ids.key` is set in `layout.yml`
+(e.g. `FEAT-2026-0009` or `FEAT-ACME-2026-0009`). Use its output as the local
+candidate; do not recount the ordinal in prose. Add `--year <YYYY>` to override
+the year. What the command cannot do stays below: source (d), which may raise the
+ordinal, and the collision check over all four sources.
 
 ### Source (c) — LEARNINGS.md and RETROSPECTIVE.md files — **ADVISORY ONLY**
 
 Read `.specfuse/LEARNINGS.md`. Read every file matching
 `.specfuse/features/*/RETROSPECTIVE.md`. For every occurrence of
-`FEAT-<YYYY>-<NNNN>` anywhere in those files, record the ID and its first
+`FEAT-<YYYY>-<NNNN>` (or keyed `FEAT-<KEY>-<YYYY>-<NNNN>`) anywhere in those files, record the ID and its first
 occurrence (file path + line number).
 
 **A source-(c) hit NEVER raises the maximum and NEVER feeds the gap report.**
@@ -129,7 +154,7 @@ min 0000   max 9301   next FEAT-2026-9302   ~9200 reported gaps
 are safe to count unconditionally because their patterns are **positional** — a
 table row, a `feature_id:` frontmatter field — rather than free prose.
 
-Source (d) is *not* positional in the same sense: it matches `FEAT-<YYYY>-`
+Source (d) is *not* positional in the same sense: it matches `FEAT-<YYYY>-` or `FEAT-<KEY>-<YYYY>-`
 anywhere in an issue/PR title or body, so a body that **quotes** an ID — a bug
 report reproducing this exact contamination (#1872), a paste of `tests/`
 fixture content, a cross-repo citation — is indistinguishable from a genuine
@@ -188,12 +213,14 @@ different repo (cross-repo reservations) are out of scope for the automatic scan
 
 ### Computing the next ID
 
-1. Collect all `NNNN` ordinals for the current year from the **authoritative**
-   sources — (a), (b), and (d) when GitHub was reachable, subject to the
-   plausibility bound in source (d)'s section above. Source (c) is advisory
-   and is excluded here; see its section above.
-2. If none found: next ordinal is `0001`.
-3. Otherwise: next ordinal is `max(ordinals) + 1`.
+1. Run `python3 -m specfuse.loop.ids next` — it covers (a) and (b). Then, when
+   GitHub was reachable, fold in the `NNNN` ordinals from source (d), subject
+   to the plausibility bound in source (d)'s section above. Source (c) is
+   advisory and is excluded here; see its section above.
+2. If the command's ordinal is already above every plausible source-(d)
+   ordinal, use it as printed.
+3. Otherwise: next ordinal is the highest plausible source-(d) ordinal `+ 1`,
+   rendered with the same key prefix the command printed.
 4. **Gap report — informational, NOT a stop.** Compute the missing ordinals
    between `min` and `max` and print them. A GitHub-reserved ID (source d)
    counts as **present** — it fills its own ordinal and raises `max`; it is
@@ -337,13 +364,13 @@ python3 -c "from pathlib import Path; from specfuse.loop.lint_roadmap import lin
 
 1. **Compute the next ID** using the four-source scan. Present:
    ```
-   Next available ID: FEAT-YYYY-NNNN
+   Next available ID: FEAT-YYYY-NNNN   (keyed: FEAT-<KEY>-YYYY-NNNN)
    (Highest seen: FEAT-YYYY-MMMM in <source>)
    Use this ID? [Y/n]
    ```
    On `n`, prompt:
    ```
-   Enter ID (FEAT-YYYY-NNNN format):
+   Enter ID (FEAT-YYYY-NNNN or FEAT-<KEY>-YYYY-NNNN format):
    ```
    Validate format; run collision check on the entered ID.
 

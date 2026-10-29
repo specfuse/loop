@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 2.00
 produces:
@@ -12,6 +12,15 @@ produces:
   - .specfuse/skills/draft-feature/SKILL.md
   - tests/test_roadmap_add_skill.py
   - tests/test_keyed_feature_ids_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:18:28.502186+00:00
+duration_seconds: 68.549
+cost_usd: 0.307957
+input_tokens: 20
+output_tokens: 7507
 ---
 
 # T03 — `/roadmap-add` and `/draft-feature` allocate through `ids next`

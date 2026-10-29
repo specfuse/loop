@@ -5,7 +5,7 @@
 """Feature oracle for FEAT-2026-0247 gate 1 — a keyed feature works end to end.
 
 One class per Definition-of-done clause in GATE-01.md, driven through the real
-modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02); the rest
+modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03); the rest
 are skipped naming their owner. A skip surviving to the close is a hollow oracle.
 """
 
@@ -131,9 +131,17 @@ class Clause3EverySiteAcceptsKeyedForm(unittest.TestCase):
         self.assertTrue(test_ids_call_sites.CallSiteCases.SITES)
 
 
-@unittest.skip("owned by FEAT-2026-0247/T03")
 class Clause4SkillsAllocateThroughIdsNext(unittest.TestCase):
-    pass
+    def _skill(self, name):
+        return (REPO_ROOT / "plugins" / "specfuse" / "skills" / name / "SKILL.md").read_text()
+
+    def test_roadmap_add_names_ids_next_and_a_keyed_example(self):
+        text = self._skill("roadmap-add")
+        self.assertIn("specfuse.loop.ids next", text)
+        self.assertIn("FEAT-ACME-2026-0003", text)
+
+    def test_draft_feature_points_at_ids_next(self):
+        self.assertIn("specfuse.loop.ids next", self._skill("draft-feature"))
 
 
 @unittest.skip("owned by FEAT-2026-0247/T04")
