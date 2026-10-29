@@ -141,7 +141,13 @@ specfuse lint .specfuse/features/FEAT-YYYY-NNNN-your-feature
 ```
 
 The linter checks structure: every WU has the five mandatory sections, the closing
-sequence is present and well-formed, dependencies resolve, IDs are well-formed.
+sequence is present and well-formed, dependencies resolve, IDs are well-formed
+(both `FEAT-YYYY-NNNN` and the keyed `FEAT-<KEY>-YYYY-NNNN` form).
+
+Running several repos? Optionally set `ids.key` in `.specfuse/layout.yml` so new
+IDs read `FEAT-<KEY>-YYYY-NNNN`. Pick a short key distinct across the repos of
+one project (uniqueness is by convention). Existing IDs are never renamed;
+`ids migrate --planned-only` re-keys folderless planned rows only.
 Fix anything it flags before dispatching — it's far cheaper than a failed
 dispatch.
 

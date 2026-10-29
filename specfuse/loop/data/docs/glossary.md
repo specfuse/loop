@@ -13,7 +13,8 @@ reference.
 intends to build, one row each. Add to it with `/roadmap-add`; pick what to
 build next with `/pick-feature`.
 
-**Feature** — one substantial piece of work, `FEAT-YYYY-NNNN`, with a folder
+**Feature** — one substantial piece of work, `FEAT-YYYY-NNNN` (`FEAT-<KEY>-YYYY-NNNN` when
+`ids.key` is set in `.specfuse/layout.yml`; legacy IDs are never renamed), with a folder
 under `.specfuse/features/`. Its `PLAN.md` holds the goal, the gates, and the
 budget. Roughly: a thing you would describe in a sentence to someone who does
 not work on the project.
@@ -24,7 +25,7 @@ and you decide** — everything inside one runs unattended; the boundary between
 two is yours.
 
 **Work unit (WU)** — the smallest dispatchable piece: one file, one job, one
-fresh session. `FEAT-YYYY-NNNN/T01`. Everything the session needs is in that
+fresh session. `FEAT-YYYY-NNNN/T01` (keyed: `FEAT-<KEY>-YYYY-NNNN/T01`). Everything the session needs is in that
 file, because it starts with no memory of anything before it.
 
 **Verification** — the commands in `.specfuse/verification.yml` that decide

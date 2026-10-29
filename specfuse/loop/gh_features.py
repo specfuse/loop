@@ -13,9 +13,11 @@ import subprocess
 import sys
 from typing import Any, Optional
 
+from specfuse.loop import ids
+
 # Matches [INIT-YYYY-NNNN/FNN] or [FEAT-YYYY-NNNN] at the start of a title.
 _TITLE_RE = re.compile(
-    r"^\[(?P<id>(?:INIT-\d{4}-\d{4}/F\d{2}|FEAT-\d{4}-\d{4}))\]\s*(?P<summary>.*)$"
+    r"^\[(?P<id>(?:INIT-\d{4}-\d{4}/F\d{2}|" + ids.FEATURE_ID_PATTERN + r"))\]\s*(?P<summary>.*)$"
 )
 
 FEATURE_LABEL = "specfuse:feature"
@@ -46,11 +48,19 @@ def _extract_label_value(labels: list, prefix: str) -> Optional[str]:
     return None
 
 
-def list_features(repo: str, runner: Any = None) -> list:
+def _canonical(feature_id: str, repo_root: Any) -> str:
+    if feature_id.startswith("INIT-"):
+        return feature_id
+    return ids.resolve(repo_root if repo_root is not None else ".", feature_id)
+
+
+def list_features(repo: str, runner: Any = None, repo_root: Any = None) -> list:
     """Return loop-feature candidates for open specfuse:feature issues in repo.
 
     runner: callable(repo: str) -> list[dict]. Defaults to shelling out to gh.
     Issues whose titles lack a parseable [<id>] tag are skipped with a warning.
+    A `[FEAT-…]` tag that is an old ID in `.specfuse/id-aliases.yml` under
+    *repo_root* (default: the working directory) maps to its renamed feature.
     """
     if runner is None:
         runner = _default_runner
@@ -71,7 +81,7 @@ def list_features(repo: str, runner: Any = None) -> list:
 
         labels = issue.get("labels", [])
         candidates.append({
-            "feature_id": m.group("id"),
+            "feature_id": _canonical(m.group("id"), repo_root),
             "title": m.group("summary").strip(),
             "initiative": _extract_label_value(labels, "initiative:"),
             "task_type": _extract_label_value(labels, "type:"),

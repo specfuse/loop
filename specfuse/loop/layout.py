@@ -6,7 +6,7 @@
 """Project layout resolver — FEAT-2026-0224 (project-configurable layout).
 
 Reads an optional `.specfuse/layout.yml` and answers `layout get <key>` for
-`decisions.style`, `decisions.location` and `decisions.link`.
+`decisions.style`, `decisions.location`, `decisions.link` and `ids.key`.
 
 Contract: no file (or no `decisions:` block) means today's behaviour — style
 `adr`, location `docs/adr`, link `{path}`. An `entries` style with `location`
@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Optional
 
 from specfuse.loop import _miniyaml
+from specfuse.loop.ids import KEY_PATTERN, KEY_RE
 
 LAYOUT_RELPATH = Path(".specfuse") / "layout.yml"
 
@@ -40,11 +41,11 @@ _STYLE_DEFAULTS = {
 }
 _FALLBACK_DEFAULTS = _STYLE_DEFAULTS["adr"]
 
-KEYS = ("decisions.style", "decisions.location", "decisions.link")
+KEYS = ("decisions.style", "decisions.location", "decisions.link", "ids.key")
 
 VALID_STYLES = ("adr", "entries")
 LINK_PLACEHOLDERS = ("location", "path", "id", "domain")
-KNOWN_TOP_LEVEL = ("decisions",)
+KNOWN_TOP_LEVEL = ("decisions", "ids")
 _PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
@@ -57,8 +58,14 @@ class Decisions:
 
 
 @dataclass(frozen=True)
+class Ids:
+    key: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class Layout:
     decisions: Decisions
+    ids: Ids = Ids()
 
 
 def _normalise(location: str) -> str:
@@ -95,7 +102,12 @@ def load(repo_root) -> Layout:
     path = Path(repo_root) / LAYOUT_RELPATH
     data = _read(path)
     block = data.get("decisions") if isinstance(data, dict) else None
-    return Layout(decisions=_resolve_decisions(block if isinstance(block, dict) else None))
+    ids_block = data.get("ids") if isinstance(data, dict) else None
+    key = ids_block.get("key") if isinstance(ids_block, dict) else None
+    return Layout(
+        decisions=_resolve_decisions(block if isinstance(block, dict) else None),
+        ids=Ids(key=None if key is None else str(key)),
+    )
 
 
 def _line_of(text: str, key: str) -> int:
@@ -144,6 +156,17 @@ def validate(repo_root) -> list:
             )
         elif key not in KNOWN_TOP_LEVEL:
             add(SEVERITY_WARN, key, f"unknown top-level key {key!r} in layout.yml")
+
+    ids_block = data.get("ids")
+    if isinstance(ids_block, dict) and ids_block.get("key") is not None:
+        key = str(ids_block["key"])
+        if not KEY_RE.match(key):
+            add(
+                SEVERITY_ERROR,
+                "key",
+                f"ids.key {key!r} is invalid; must match {KEY_PATTERN} "
+                "(2-6 characters, upper-case letters and digits, starting with a letter)",
+            )
 
     block = data.get("decisions")
     if not isinstance(block, dict):
@@ -214,6 +237,8 @@ def findings_for_location(findings) -> list:
 def get(layout: Layout, key: str) -> str:
     if key not in KEYS:
         raise KeyError(key)
+    if key == "ids.key":
+        return layout.ids.key or ""
     return getattr(layout.decisions, key.split(".", 1)[1])
 
 

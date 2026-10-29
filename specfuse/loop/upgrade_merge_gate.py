@@ -20,11 +20,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from specfuse.loop import ids
+
 _DETAIL_TAIL_CHARS = 500
 
 # Feature folders are `FEAT-YYYY-NNNN-<slug>`; anything else under
 # .specfuse/features/ is incidental and not evidence about conformance (#309).
-_FEATURE_DIR_RE = re.compile(r"^FEAT-\d{4}-\d{4}-")
+_FEATURE_DIR_RE = re.compile(r"^" + ids.FEATURE_ID_PATTERN + r"-")
 
 
 def decide(ci_all_green: bool, feature_reports: list[dict]) -> tuple[str, str]:

@@ -17,7 +17,7 @@
     "feature_correlation_id": {
       "type": "string",
       "description": "The feature-level correlation ID of the feature whose specs were validated. Duplicated from the envelope `correlation_id` for payload self-containment — downstream consumers that index payloads without re-reading the envelope benefit from the redundancy.",
-      "pattern": "^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?$"
+      "pattern": "^(FEAT-(?:[A-Z][A-Z0-9]{1,5}-)?|INIT-)\\d{4}-\\d{4}(/F\\d{2})?$"
     },
     "pass": {
       "type": "boolean",

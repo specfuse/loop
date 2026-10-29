@@ -156,7 +156,8 @@ class NoLayoutGoldens(unittest.TestCase):
 
 
 # sha256 of HEAD's roadmap.template.md (before the layout region markers).
-GOLDEN_TEMPLATE_SHA256 = "de1fdd5dcfdfe9f55757e640585983794de8cbcbc070d01511840e2bf7666c8c"
+# Re-recorded for FEAT-2026-0247/T06, which intentionally changed the template's Notes.
+GOLDEN_TEMPLATE_SHA256 = "1a0deeb13ed6411c3594487909e5d89b7ecb6029695f0009869d916d33807f67"
 
 
 class NoLayoutTemplateGoldens(unittest.TestCase):

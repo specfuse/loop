@@ -46,6 +46,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import re
 
+from specfuse.loop import ids as _ids
 from specfuse.loop import layout as _layout
 
 SEVERITY_ERROR = "error"
@@ -54,11 +55,14 @@ SEVERITY_WARN = "warn"
 ROADMAP_FILENAME = "roadmap.md"
 ARCHIVE_FILENAME = "roadmap-archive.md"
 
-_ANCHOR_RE = re.compile(r'<a\s+id="(feat-\d{4}-\d{4})"\s*>\s*</a>', re.IGNORECASE)
-_HEADING_RE = re.compile(r'^##\s+(FEAT-\d{4}-\d{4})\b', re.IGNORECASE)
-_ROW_RE = re.compile(r'^\|\s*(FEAT-\d{4}-\d{4})\s*\|')
+_ANCHOR_PATTERN = _ids.FEATURE_ID_PATTERN.lower()
+_ANCHOR_RE = re.compile(r'<a\s+id="(' + _ANCHOR_PATTERN + r')"\s*>\s*</a>', re.IGNORECASE)
+_HEADING_RE = re.compile(r'^##\s+(' + _ids.FEATURE_ID_PATTERN + r')\b', re.IGNORECASE)
+_ROW_RE = re.compile(r'^\|\s*(' + _ids.FEATURE_ID_PATTERN + r')\s*\|')
 _LINK_RE = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
-_REF_RE = re.compile(r'^(roadmap\.md|roadmap-archive\.md)?#(feat-\d{4}-\d{4})$', re.IGNORECASE)
+_REF_RE = re.compile(
+    r'^(roadmap\.md|roadmap-archive\.md)?#(' + _ANCHOR_PATTERN + r')$', re.IGNORECASE
+)
 _BLOCKED_BY_RE = re.compile(r'^\*\*Blocked by\.\*\*\s*(.*)$')
 _ORPHAN_DETAIL_CELLS = {"—", "-", ""}
 # A detail section's status marker. Trailing prose on the same line is common
@@ -133,6 +137,7 @@ def _lint_roadmap_impl(repo_root: Path) -> list:
     findings += _check_blocked_by(roadmap_doc, archive_doc, rows, repo_root)
     findings += _check_orphan_sections(roadmap_doc, archive_doc, rows)
     findings += _check_section_status(roadmap_doc, archive_doc, rows)
+    findings += _check_unkeyed_planned(rows, repo_root)
     findings += _layout.validate(repo_root)
 
     return findings
@@ -355,6 +360,30 @@ def roadmap_statuses(repo_root=None) -> dict:
         return {}
     lines = roadmap_path.read_text(encoding="utf-8").splitlines()
     return {row["id"]: row["status"] for row in _parse_table_rows(lines)}
+
+
+def _check_unkeyed_planned(rows, repo_root: Path) -> list:
+    """With `ids.key` set, warn on each `planned` row still allocated the legacy way."""
+    try:
+        key = _layout.get(_layout.load(repo_root), "ids.key")
+    except Exception:  # noqa: BLE001 - a bad layout is _layout.validate's finding, not ours
+        return []
+    if not key:
+        return []
+    findings = []
+    for row in rows:
+        if row["status"] != "planned":
+            continue
+        parsed = _ids.parse(row["id"])
+        if parsed is None or parsed.key:
+            continue
+        findings.append(Finding(
+            SEVERITY_WARN, ROADMAP_FILENAME, row["line"],
+            f"{row['id']} is planned but has no project key; layout.yml sets "
+            f"ids.key: {key} — re-key it with "
+            "`python3 -m specfuse.loop.ids migrate --planned-only`",
+        ))
+    return findings
 
 
 def _detail_sections(lines) -> dict:

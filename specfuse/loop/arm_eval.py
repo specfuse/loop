@@ -111,6 +111,7 @@ JUDGE_MODULES = tuple(
         "criteria_state.py",
         "lint_closing.py",
         "lint_plan.py",
+        "ids.py",                # supplies lint_plan's CORRELATION_ID_RE; an edit changes what the close's lint accepts
         "plan_baseline.py",      # the baseline retroactive_edits compares to
         "roadmap_archive.py",    # CLI entry for auto_archive_feature; assert_terminal_flips_fired depends on it
         # The driver: dispatch guards, halt classification, the produces gate,

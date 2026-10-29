@@ -64,6 +64,7 @@ from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
 from . import criteria_state
+from . import ids as _ids
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES, parse_changelog
 from .closing_requirements import (
@@ -298,7 +299,7 @@ LEARNINGS_REACH_TIEBREAK_CAVEAT = (
     "in which to be cited."
 )
 
-_LEARNINGS_FEAT_ID_RE = re.compile(r"^(FEAT-\d{4}-\d{4})")
+_LEARNINGS_FEAT_ID_RE = re.compile(r"^(" + _ids.FEATURE_ID_PATTERN + r")")
 
 
 def score_learnings_entries(
@@ -1157,7 +1158,7 @@ def write_frontmatter_block(path: Path, key: str, block_lines: list[str]) -> Non
 # --------------------------------------------------------------------------- #
 
 
-_FEATURE_ID_RE = re.compile(r"^FEAT-\d{4}-\d{4}$")
+_FEATURE_ID_RE = _ids.FEATURE_ID_RE
 
 
 def _resolve_feature_dir(arg: str) -> Path:
@@ -1176,6 +1177,9 @@ def _resolve_feature_dir(arg: str) -> Path:
     direct = FEATURES_DIR / arg
     if (direct / "PLAN.md").exists():
         return direct
+
+    if _FEATURE_ID_RE.match(arg):
+        arg = _ids.resolve(REPO_ROOT, arg)
 
     if not _FEATURE_ID_RE.match(arg):
         sys.exit(f"No PLAN.md under {direct}{_feature_hint()}")
@@ -8534,7 +8538,7 @@ def _parse_roadmap_row(roadmap_text: str, feature_id: str) -> dict | None:
 # --------------------------------------------------------------------------- #
 
 
-_BARE_FEAT_REF_RE = re.compile(r'\]\(#(feat-\d{4}-\d{4})\)')
+_BARE_FEAT_REF_RE = re.compile(r'\]\(#(' + _ids.FEATURE_ID_PATTERN.lower() + r')\)')
 #: A section's status marker stands alone at the start of its own line. Kept
 #: deliberately in step with `lint_roadmap._SECTION_STATUS_RE`, which is what
 #: judges the result -- an archiver matching something the linter does not can

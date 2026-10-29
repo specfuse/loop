@@ -33,6 +33,7 @@ import re
 from pathlib import Path
 
 from . import _miniyaml
+from . import ids as _ids
 from . import _wu_sections
 from .closing_requirements import (
     LEARNINGS_PATH,
@@ -106,7 +107,7 @@ FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 # `rules/correlation-ids.md` — that file is vendored from core, so a loop-local
 # addition to it is reverted by the next `sync-scaffold.sh` run (#581).
 CORRELATION_ID_RE = re.compile(
-    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|"
+    r"^(" + _ids.FEATURE_ID_PATTERN + r"(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|"
     r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$"
 )
 # The five mandatory sections (architecture §8). 'Objective' is recommended in the

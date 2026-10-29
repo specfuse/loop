@@ -35,12 +35,13 @@ import json
 import re
 from typing import Callable, Optional
 
+from specfuse.loop import ids
 from specfuse.loop.triage import FEATURE_LABEL
 
 #: Shape of an allocated roadmap ID. Narrow on purpose: the ledger's whole
 #: value is the link back to a real roadmap row, and a typo'd ID records a
 #: link to nothing while looking exactly like a link to something.
-FEATURE_ID_RE = re.compile(r"^FEAT-\d{4}-\d{4}$")
+FEATURE_ID_RE = ids.FEATURE_ID_RE
 
 _MARKER_TEMPLATE = "<!-- specfuse:promoted feature_id={feature_id} -->"
 _MARKER_RE = re.compile(r"<!-- specfuse:promoted feature_id=(?P<feature_id>\S+) -->")
