@@ -19,9 +19,9 @@ driver_version: 0.30.0
 started_at: 2026-10-29T19:57:52.322427+00:00
 verdict: met
 duration_seconds: 764.922
-cost_usd: 1.080722
-input_tokens: 54
-output_tokens: 26443
+cost_usd: 1.308908
+input_tokens: 64
+output_tokens: 28689
 ---
 
 # G1-CLOSE — terminal close
