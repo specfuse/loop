@@ -522,7 +522,10 @@ def _validate_tree_here(root: Path) -> list:
     errors = []
     features = root / ".specfuse" / "features"
     if features.is_dir():
-        for folder in sorted(p for p in features.iterdir() if p.is_dir()):
+        # Only `<ID>-<slug>` folders are features; harness dot-dirs and notes are not (#3554).
+        for folder in sorted(
+            p for p in features.iterdir() if p.is_dir() and parse(p.name) is not None
+        ):
             errors.extend(
                 f"ERROR: {folder.name}: {e}"
                 for e in lint_plan.lint(folder)

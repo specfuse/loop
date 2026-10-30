@@ -42,6 +42,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 - **This repository now sets `ids.key: LOOP` in `.specfuse/layout.yml`.** New features here are allocated as `FEAT-LOOP-YYYY-NNNN`; this feature, `FEAT-LOOP-2026-0248`, is the first. Existing `FEAT-2026-NNNN` features are not renamed: applying `ids migrate --all` to `main` is a separate operator decision, and a rehearsal of it with the prose scope above passes this repository's full test suite. Other repositories are unaffected unless they set a key. (FEAT-LOOP-2026-0248)
 - **Consumer projects now halt once when a terminal gate edits `.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/` or `pyproject.toml`.** The check uses the same `JUDGE_PATHS` as the arm class, and those five entries match in every repository, so this applies to projects that never had the driver source. A feature whose last gate declares one of them in a unit's `produces:` stops before its close with `judge_editing_terminal`; acknowledge it as in the entry above. The driver's own modules and data entries never match in a consumer repository. `/draft-feature`, `docs/methodology.md` and `docs/concepts/autonomy-stop-classes.md` no longer recommend `review` as the safeguard for a terminal-gate judge edit, since it adds none. (FEAT-2026-0246)
 
+### Fixed
+
+- **`ids migrate --all --apply` no longer reports a false error for a directory under `.specfuse/features/` that is not a feature.** The validation that ends the rename ran `lint_plan` over every subdirectory, so an empty, untracked harness directory such as `.specfuse/features/.claude` failed with `missing …/PLAN.md` and the run exited 1 after a correct rename. A `--rehearse` of the same rename passed, because the throwaway worktree is built from git and has no such directory. Validation now lints only folders whose name is `<ID>-<slug>`, the same set the rename touches. (#3554)
+
 ## [0.30.0+umbrella.0.15.0] - 2026-10-27
 
 ### Added
