@@ -18,11 +18,17 @@ narrow, or reject** at PR review.
   zero on the real repository", run the command (dry run or rehearsal) at planning time
   and put its observed output in the unit's context.
 
+  > **Accepted 2026-10-30** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0248/G1-CLOSE]`.
+
 - **[FEAT-LOOP-2026-0248/G1-CLOSE] A tool that validates a tree must run the tree's own
   code.** The post-apply check ran in the real checkout's process, so a rehearsal was
   judged by modules the rename had not touched (T06). A check of a copy runs in a fresh
   process with that copy on the path.
 
+  > **Accepted 2026-10-30** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0248/G1-CLOSE]`.
+
 - **[FEAT-LOOP-2026-0248/G1-CLOSE] The driver's `cumulative_cost_usd` drops attempts
   before a re-arm.** T05 reads $2.37 against $3.41 summed from `attempt_outcome` events.
   Reconcile a close's cost from the events, not the frontmatter.
+
+  > **Rejected 2026-10-30** — a driver bug, not a planning rule; tracked as #3552. Until it is fixed, `/gate-status` already treats `events.jsonl` as the cost source of truth.
