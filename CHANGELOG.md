@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ids migrate --all` finishes on a large repository.** The rewrite ran its whole per-ID loop, with two regular expressions and a scan of every feature folder per ID, on every line of every tracked file, so a repository with about 1.5 million lines and 255 IDs to re-key had not finished after 30 minutes. A line that contains no `feat-` (case-insensitive) now skips the loop, an ID is tried only on lines that contain it, and the folder list for each ID is built once per file. The output is unchanged: on this repository's tree from before its re-key, the dry run produces the same plan in 1.6 seconds instead of 265. (#3559)
+
 ## [0.31.0+umbrella.0.15.0] - 2026-10-30
 
 ### Added
