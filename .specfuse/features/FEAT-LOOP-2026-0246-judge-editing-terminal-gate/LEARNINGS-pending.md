@@ -20,6 +20,8 @@ are staged for the operator to **promote, narrow, or reject** at PR review.
   attribute more than once, restore in reverse, and run it in one process with the
   neighbouring modules that read that attribute before calling the unit done.
 
+  > **Accepted 2026-10-30** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0246/G1-CLOSE]`.
+
 - **[FEAT-LOOP-2026-0246/G1-CLOSE] Follow an operator instruction in a halt brief
   literally before shipping it.** The first `judge_editing_terminal` brief said to
   list "the paths" in `judge_edit_acknowledged`, but a `produces_driver_helper` hit is
@@ -27,3 +29,5 @@ are staged for the operator to **promote, narrow, or reject** at PR review.
   file paths would have re-fired the stop. The unit tests asserted the brief's six
   parts, not that its advice clears the stop. For any halt that tells a person what to
   write, add a test that takes the brief's own example and checks the stop clears.
+
+  > **Accepted 2026-10-30** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0246/G1-CLOSE]`.

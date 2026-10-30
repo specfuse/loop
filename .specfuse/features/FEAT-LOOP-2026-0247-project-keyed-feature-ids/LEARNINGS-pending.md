@@ -22,8 +22,12 @@ are staged for the operator to **promote, narrow, or reject** at PR review.
   symbol a real caller, re-record any golden the unit changes on purpose" in the
   tracer-bullet unit's criteria, and name the three test modules there.
 
+  > **Accepted 2026-10-30** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0247/G1-CLOSE]`.
+
 - **[FEAT-LOOP-2026-0247/G1-CLOSE] Do not promise a helper in PLAN "Known limits" that no
   caller will use.** PLAN said "T01's sort key is available where order matters"; no
   site ever called `ids.sort_key`, the caller ratchet rejected it, and T10 deleted it,
   leaving the limit's sentence false. If a limit is "lexical order is good enough",
   say that and stop; add the helper in the unit that first needs it.
+
+  > **Accepted 2026-10-30** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0247/G1-CLOSE]`.
