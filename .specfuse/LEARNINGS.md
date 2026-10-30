@@ -4594,3 +4594,49 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   was one test, but it cost a failed broad run and a gate returned to `awaiting_review`.
   When the plan edits a template or a seed, grep `tests/` for the artifact's filename
   and list each hit in the unit's `produces:` or its Do-not-touch exceptions.
+
+- [FEAT-LOOP-2026-0246/G1-CLOSE] **A test helper that patches the same module global more
+  than once must restore it in reverse order, or from a saved original.** The oracle's
+  `_stub_agent()` ran once per autonomy level and `tearDown` undid `self._patches` in
+  forward order, so the last restore put back a stub and left `loop.verify` stubbed for the
+  rest of the process. Every unit's narrow tier passed; the broad run failed twice on 14
+  tests in three modules outside every unit's `produces:`. When a test passes alone and
+  fails in the full suite, look for a leaked patch before blaming the environment, and run
+  a module that patches shared globals together with its neighbours before calling the
+  unit done.
+
+- [FEAT-LOOP-2026-0246/G1-CLOSE] **A halt brief that tells a person what to write needs a
+  test that follows its advice and checks the stop clears.** The first
+  `judge_editing_terminal` brief said to list "the paths" in `judge_edit_acknowledged`,
+  but a `produces_driver_helper` hit is cleared only by that literal key, so an operator
+  who listed file paths would have re-fired the stop. The unit tests asserted the brief's
+  six parts, not that its example works. Feed the brief's own example back into the check
+  in a test.
+
+- [FEAT-LOOP-2026-0247/G1-CLOSE] **A unit that adds a module under `specfuse/loop/` must also
+  join the suite-wide registries, and the walking skeleton is where to list them.** The
+  new `ids.py` passed every narrow tier, then the broad run failed four checks in modules
+  outside every unit's `produces:`: the module was in neither `JUDGE_MODULES` nor
+  `NON_JUDGE_MODULES` (`test_judge_path_registry`), two public helpers had no caller
+  outside `tests/` (`test_caller_check_ratchet`), and a deliberate template edit left
+  `GOLDEN_TEMPLATE_SHA256` stale (`test_layout_no_layout_goldens`). Put "classify the
+  module, give each public symbol a real caller, re-record any golden changed on purpose"
+  in the tracer-bullet unit's criteria, naming those three test modules.
+
+- [FEAT-LOOP-2026-0247/G1-CLOSE] **Do not promise in PLAN a helper that no unit will call.**
+  PLAN's Known limits said a sort key "is available where order matters"; no site called
+  `ids.sort_key`, the caller ratchet rejected it, and a later unit deleted it, leaving the
+  sentence false. If a limit is "lexical order is good enough", say that and stop; add the
+  helper in the unit that first needs it.
+
+- [FEAT-LOOP-2026-0248/G1-CLOSE] **When a unit's acceptance is "this command exits zero on
+  the real repository", run the command at planning time and put its output in the unit.**
+  T05 was planned with a prose scope nobody had run; two rehearsals showed it rewrote test
+  fixtures and vendored files, and T05 blocked three times before passing, adding T06–T08.
+  A dry run or rehearsal before drafting would have found all three gaps up front.
+
+- [FEAT-LOOP-2026-0248/G1-CLOSE] **A check of a copied or rewritten tree must run that tree's
+  own code, in a fresh process.** The post-rename validation imported the linters into the
+  running process, so a rehearsal was judged by the real checkout's modules, whose
+  exemption table still held the old folder names, and failed falsely (T06). Run such a
+  check as a subprocess with `cwd` and `PYTHONPATH` set to the tree it judges.
