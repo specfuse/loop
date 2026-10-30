@@ -405,6 +405,8 @@ def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
     if is_changelog and span is None:
         span = (len(lines), len(lines))
     pairs = [(o, n) for o, n in renames]
+    # Built once per file, not per ID per line (#3559).
+    owned = {o: [f for f in folders if f.startswith(o + "-")] for o, _ in pairs}
     out, fenced = [], False
     for no, line in enumerate(lines):
         if is_changelog and not (span[0] <= no < span[1]):
@@ -417,7 +419,15 @@ def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
         row = bool(is_roadmap and _ROW_ID_RE.match(line))
         heading = bool(is_roadmap and re.match(r"^#{1,6}\s", line))
         frontmatter = no <= fm_end or no in graph
+        low = line.lower()
+        # Every old ID is `FEAT-…` and its anchor `feat-…`: a line naming neither
+        # cannot match, so the per-ID loop is skipped (#3559).
+        if "feat-" not in low:
+            out.append(line)
+            continue
         for old, new in pairs:
+            if anchor(old) not in low:
+                continue
             line = _rewrite_line(
                 line, old, new,
                 structural=row or heading or frontmatter,
@@ -425,8 +435,9 @@ def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
                 events=is_events,
                 prose=include_prose and not fenced,
                 where=(rel, no + 1, plan),
-                folders=[f for f in folders if f.startswith(old + "-")],
+                folders=owned[old],
             )
+            low = line.lower()
         out.append(line)
     return "".join(out)
 
