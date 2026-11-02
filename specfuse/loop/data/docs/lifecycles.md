@@ -175,6 +175,18 @@ hit stops the branch rather than shipping feature-scoped work as a bug fix.
 **The `CHANGELOG.md` entry is written here or nowhere.** Bugs have no close
 ceremony to collect through, so `/fix-bug` is the collection point.
 
+`/fix-bug` records the entry with `python3 -m specfuse.loop.changelog_fragments add`
+(trace `#<issue-number>`) and commits what it wrote with the fix.
+
+**Opting in to fragments.** By default entries append to `CHANGELOG.md`. To
+stop concurrent PRs colliding on that file, set `changelog.mode: fragments` in
+`.specfuse/layout.yml`; `add` then writes one `changelog.d/<trace>-<slug>.md`
+per entry. Add `python3 -m specfuse.loop.changelog_fragments check` as a gate
+in `.specfuse/verification.yml` to fail on malformed fragments. A custom
+release script must run `python3 -m specfuse.loop.changelog_fragments collate`
+before stamping the release, so fragments fold into `CHANGELOG.md` and are
+deleted first.
+
 ---
 
 ## 3. The autonomous lifecycle

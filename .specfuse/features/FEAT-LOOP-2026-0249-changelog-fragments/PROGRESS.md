@@ -5,3 +5,4 @@
   - note: `collate_text` is pure (validates all fragments, parses result, writes nothing); `release()` deletes fragments last, so rejected stamp or invalid fragment leaves tree untouched. T04 clause 4 test still skipped.
 - **FEAT-LOOP-2026-0249/T04**: attempt 1 outcome=passed
 - **FEAT-LOOP-2026-0249/T05**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0249/T06**: attempt 2 outcome=passed

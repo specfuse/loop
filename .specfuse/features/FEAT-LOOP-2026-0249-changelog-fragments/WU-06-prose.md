@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0249/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 oracle_env: macos_local
 planned_cost_usd: 2.00
 produces:
@@ -15,10 +15,10 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
-duration_seconds: 954.563
-cost_usd: 0.337605
-input_tokens: 30
-output_tokens: 6289
+duration_seconds: 947.689
+cost_usd: 0.486589
+input_tokens: 22
+output_tokens: 4820
 ---
 
 # T06 — skills, rules and docs call the writer
