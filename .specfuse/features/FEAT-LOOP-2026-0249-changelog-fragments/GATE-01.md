@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_changelog_fragments -v -b"
 cost_budget_usd: 26.00
 baseline:
