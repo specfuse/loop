@@ -10,6 +10,7 @@ One writer for changelog entries. `add` routes by `changelog.mode` in
 to `CHANGELOG.md` through `changelog.append_entry`.
 
     python3 -m specfuse.loop.changelog_fragments add --class C --trace T --summary S [--repo DIR]
+    python3 -m specfuse.loop.changelog_fragments collate [--repo DIR]
 """
 
 from __future__ import annotations
@@ -20,7 +21,13 @@ import sys
 from pathlib import Path
 
 from specfuse.loop import layout
-from specfuse.loop.changelog import _TRACE_RE, ENTRY_CLASSES, ChangelogEntry, append_entry
+from specfuse.loop.changelog import (
+    _TRACE_RE,
+    ENTRY_CLASSES,
+    ChangelogEntry,
+    append_entry,
+    parse_changelog,
+)
 
 FRAGMENT_DIR = "changelog.d"
 CHANGELOG_FILE = "CHANGELOG.md"
@@ -114,6 +121,60 @@ def add(repo_root, *, entry_class: str, trace: str, summary: str) -> Path:
     return path
 
 
+def collate_text(repo_root, text: str) -> tuple:
+    """Fold every fragment into `text`'s `Unreleased`; return `(new_text, fragment_paths)`.
+
+    Fragments fold in sorted filename order through `append_entry`. Writes and
+    deletes nothing: any malformed fragment, or a result that does not parse
+    clean, raises `ValueError` naming the file, so the caller's tree is untouched.
+    """
+    directory = Path(repo_root) / FRAGMENT_DIR
+    paths = sorted(directory.glob("*.md")) if directory.is_dir() else []
+    for path in paths:
+        if read_fragment(path) is None:
+            raise ValueError(
+                f"{FRAGMENT_DIR}/{path.name} is not a valid fragment — expected "
+                "`class:` and `trace:` frontmatter and a single-line summary"
+            )
+    for path in paths:
+        entry = read_fragment(path)
+        text = append_entry(
+            text, entry_class=entry.entry_class, summary=entry.summary, trace=entry.trace
+        )
+    if paths:
+        result = parse_changelog(text)
+        if not result.ok:
+            raise ValueError(
+                f"collating {FRAGMENT_DIR}/ leaves {CHANGELOG_FILE} unparseable: "
+                + "; ".join(str(f) for f in result.findings)
+            )
+    return text, paths
+
+
+def remove_fragments(paths) -> None:
+    """Delete consumed fragments; drop `changelog.d/` when it is left empty."""
+    parents = {Path(p).parent for p in paths}
+    for path in paths:
+        Path(path).unlink()
+    for parent in parents:
+        try:
+            parent.rmdir()
+        except OSError:
+            pass
+
+
+def collate(repo_root) -> list:
+    """Fold fragments into `CHANGELOG.md` and delete them; return the fragment paths."""
+    path = Path(repo_root) / CHANGELOG_FILE
+    if not path.is_file():
+        raise ValueError(f"{CHANGELOG_FILE} not found in {repo_root}")
+    new_text, paths = collate_text(repo_root, path.read_text(encoding="utf-8"))
+    if paths:
+        path.write_text(new_text, encoding="utf-8")
+        remove_fragments(paths)
+    return paths
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="specfuse.loop.changelog_fragments", description="Write changelog entries."
@@ -124,7 +185,17 @@ def main(argv=None) -> int:
     addp.add_argument("--class", dest="entry_class", required=True)
     addp.add_argument("--trace", required=True)
     addp.add_argument("--summary", required=True)
+    sub.add_parser("collate", help="fold changelog.d/ fragments into CHANGELOG.md and delete them")
     args = parser.parse_args(argv)
+
+    if args.command == "collate":
+        try:
+            folded = collate(args.repo)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(f"collated {len(folded)} fragment(s)")
+        return 0
 
     try:
         target = add(

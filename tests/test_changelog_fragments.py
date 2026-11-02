@@ -213,10 +213,111 @@ class TestClause2GuardsReadFragments(unittest.TestCase):
         self.assertIn("changelog.d/", description)
 
 
-@unittest.skip("T03 owns clause 3: collation at release")
+def _bump_version():
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "bump_version.py"
+    spec = importlib.util.spec_from_file_location("bump_version_oracle", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _release_tree(root: Path, mode: str | None) -> None:
+    (root / "pyproject.toml").write_text('[project]\nversion = "0.1.0"\n', encoding="utf-8")
+    (root / "specfuse" / "loop" / "data").mkdir(parents=True)
+    (root / "specfuse" / "loop" / "loop.py").write_text('DRIVER_VERSION = "0.1.0"\n', encoding="utf-8")
+    (root / ".specfuse").mkdir(exist_ok=True)
+    (root / ".specfuse" / "VERSION").write_text("0.1.0\n", encoding="utf-8")
+    (root / "specfuse" / "loop" / "data" / "VERSION").write_text("0.1.0\n", encoding="utf-8")
+    (root / "CHANGELOG.md").write_text(_SEED, encoding="utf-8")
+    if mode is not None:
+        (root / ".specfuse" / "layout.yml").write_text(
+            f"changelog:\n  mode: {mode}\n", encoding="utf-8"
+        )
+
+
 class TestClause3CollateAtRelease(unittest.TestCase):
-    def test_pending(self):
-        pass
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+        self.bump = _bump_version()
+
+    def _fragments(self, mode: str = "fragments") -> None:
+        _release_tree(self.root, mode)
+        for trace, summary, cls in (
+            ("#102", "beta change", "added"),
+            ("#101", "alpha change", "fixed"),
+            ("#103", "gamma change", "added"),
+        ):
+            done = _add(self.root, trace=trace, summary=summary, entry_class=cls)
+            self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_release_folds_every_fragment_and_removes_them(self):
+        self._fragments()
+        self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-02")
+        result = parse_changelog((self.root / "CHANGELOG.md").read_text(encoding="utf-8"))
+        self.assertTrue(result.ok, result.findings)
+        released = [s for s in result.sections if not s.is_unreleased]
+        self.assertEqual(
+            sorted(e.trace for e in released[0].entries if e.summary.endswith("change")),
+            ["#101", "#102", "#103"],
+        )
+        self.assertEqual(result.unreleased().entries, [])
+        self.assertEqual(list((self.root / "changelog.d").glob("*.md")) if (self.root / "changelog.d").exists() else [], [])
+
+    def test_collation_runs_whatever_the_mode(self):
+        self._fragments("fragments")
+        (self.root / ".specfuse" / "layout.yml").write_text(
+            "changelog:\n  mode: single\n", encoding="utf-8"
+        )
+        self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-02")
+        text = (self.root / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("alpha change (#101)", text)
+        self.assertFalse((self.root / "changelog.d").exists())
+
+    def test_output_is_deterministic_in_filename_order(self):
+        self._fragments()
+        self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-02")
+        text = (self.root / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertLess(text.index("beta change"), text.index("gamma change"))
+
+    def test_invalid_fragment_refuses_naming_it_and_touches_nothing(self):
+        self._fragments()
+        (self.root / "changelog.d" / "bad.md").write_text("no frontmatter\n", encoding="utf-8")
+        before = (self.root / "CHANGELOG.md").read_text(encoding="utf-8")
+        with self.assertRaises(ValueError) as ctx:
+            self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-02")
+        self.assertIn("bad.md", str(ctx.exception))
+        self.assertEqual((self.root / "CHANGELOG.md").read_text(encoding="utf-8"), before)
+        self.assertEqual(len(list((self.root / "changelog.d").glob("*.md"))), 4)
+        self.assertIn('"0.1.0"', (self.root / "pyproject.toml").read_text(encoding="utf-8"))
+
+    def test_double_stamp_refusal_leaves_every_fragment(self):
+        self._fragments()
+        self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-02")
+        self._fragments_again = _add(self.root, trace="#104", summary="delta change")
+        self.assertEqual(self._fragments_again.returncode, 0)
+        before = (self.root / "CHANGELOG.md").read_text(encoding="utf-8")
+        with self.assertRaises(ValueError):
+            self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-03")
+        self.assertEqual(len(list((self.root / "changelog.d").glob("*.md"))), 1)
+        self.assertEqual((self.root / "CHANGELOG.md").read_text(encoding="utf-8"), before)
+
+    def test_collate_subcommand(self):
+        self._fragments()
+        env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+        done = subprocess.run(
+            [sys.executable, "-m", "specfuse.loop.changelog_fragments",
+             "--repo", str(self.root), "collate"],
+            capture_output=True, text=True, env=env, check=False,
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertFalse((self.root / "changelog.d").exists())
+        result = parse_changelog((self.root / "CHANGELOG.md").read_text(encoding="utf-8"))
+        self.assertEqual(len(result.unreleased().entries), 3)
 
 
 @unittest.skip("T04 owns clause 4: the check gate")
@@ -237,9 +338,17 @@ class TestClause5NoModeKeyBehavesAsBefore(unittest.TestCase):
             self.assertTrue(result.ok, result.findings)
             self.assertEqual([e.trace for e in result.unreleased().entries], ["#7"])
 
-    @unittest.skip("T03 owns the release-output half of clause 5")
     def test_release_without_fragments_unchanged(self):
-        pass
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _release_tree(root, None)
+            bump = _bump_version()
+            expected = bump._changelog.stamp_release(
+                _SEED, version="0.2.0", date="2026-11-02", umbrella_version="0.2.0"
+            )
+            bump.release(root, "0.2.0", "0.2.0", date="2026-11-02")
+            self.assertEqual((root / "CHANGELOG.md").read_text(encoding="utf-8"), expected)
+            self.assertFalse((root / "changelog.d").exists())
 
 
 if __name__ == "__main__":

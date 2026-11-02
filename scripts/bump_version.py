@@ -65,6 +65,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from specfuse.loop import _miniyaml  # noqa: E402
 from specfuse.loop import changelog as _changelog  # noqa: E402
+from specfuse.loop import changelog_fragments as _fragments  # noqa: E402
 
 _SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.]+)?$")
 
@@ -278,8 +279,12 @@ def release(
         date = _date.today().isoformat()
 
     changelog_path = root / "CHANGELOG.md"
+    # Fragments fold into Unreleased first, whatever the mode; stamping runs after.
+    collated, fragment_paths = _fragments.collate_text(
+        root, changelog_path.read_text(encoding="utf-8")
+    )
     stamped = _changelog.stamp_release(
-        changelog_path.read_text(encoding="utf-8"),
+        collated,
         version=version,
         date=date,
         umbrella_version=umbrella_version,
@@ -287,6 +292,7 @@ def release(
 
     changed = set_version(root, version, config)
     changelog_path.write_text(stamped, encoding="utf-8")
+    _fragments.remove_fragments(fragment_paths)
     changed.append("CHANGELOG.md")
     return changed
 
