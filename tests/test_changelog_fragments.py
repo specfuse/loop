@@ -391,5 +391,19 @@ class TestClause5NoModeKeyBehavesAsBefore(unittest.TestCase):
             self.assertFalse((root / "changelog.d").exists())
 
 
+class RepoOptInTests(unittest.TestCase):
+    def _get(self, key: str) -> str:
+        return subprocess.run(
+            [sys.executable, "-m", "specfuse.loop.layout", "get", key],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+    def test_this_repo_mode_is_fragments(self):
+        self.assertEqual(self._get("changelog.mode"), "fragments")
+
+    def test_this_repo_ids_key_unchanged(self):
+        self.assertEqual(self._get("ids.key"), "LOOP")
+
+
 if __name__ == "__main__":
     unittest.main()
