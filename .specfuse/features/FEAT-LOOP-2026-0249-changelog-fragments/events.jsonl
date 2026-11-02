@@ -1,0 +1,1 @@
+{"timestamp": "2026-11-02T16:09:16.863676+00:00", "correlation_id": "FEAT-LOOP-2026-0249", "event_type": "driver_build_pinned", "source": "driver", "source_version": "0.31.1", "payload": {"tree": "597690f75955647ee91d3fd53aa9c89a37503109", "path": "/private/var/folders/zc/rgq11x850d78dx_kf1fd4vx80000gn/T/specfuse-pins/597690f75955647ee91d3fd53aa9c89a37503109/specfuse/loop"}}
