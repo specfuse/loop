@@ -15,6 +15,10 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+duration_seconds: 954.563
+cost_usd: 0.337605
+input_tokens: 30
+output_tokens: 6289
 ---
 
 # T06 — skills, rules and docs call the writer
