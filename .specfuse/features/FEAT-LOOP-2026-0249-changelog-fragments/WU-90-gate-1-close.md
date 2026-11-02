@@ -1,7 +1,7 @@
 ---
 id: FEAT-LOOP-2026-0249/G1-CLOSE
 type: close
-status: pending
+status: blocked_human
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
