@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0249/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.50
 produces:
@@ -15,6 +15,12 @@ model: sonnet
 effort: high
 gate_set: code
 produces_driver_helper: [_unreleased_has_entry_for, assert_changelog_entry_for_contract_changes]
+driver_version: 0.31.1
+started_at: 2026-11-02T16:10:21.928001+00:00
+duration_seconds: 124.011
+cost_usd: 0.681229
+input_tokens: 44
+output_tokens: 14217
 ---
 
 # T02 — one reader for all three guards

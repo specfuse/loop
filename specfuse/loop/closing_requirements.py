@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 # --------------------------------------------------------------------------- #
@@ -232,6 +233,35 @@ def changelog_has_entry_for(unreleased_entries, feature_id: str) -> bool:
     )
 
 
+def changelog_exists(repo_root) -> bool:
+    """True if the project has a changelog in either form: `CHANGELOG.md` or `changelog.d/*.md`."""
+    root = Path(repo_root)
+    return (root / CHANGELOG_PATH).exists() or any((root / "changelog.d").glob("*.md"))
+
+
+def changelog_has_entry_for_feature(repo_root, feature_id: str) -> bool:
+    """True if *feature_id* has an entry in `CHANGELOG.md`'s Unreleased section or a valid fragment.
+
+    The one reader behind close-k, `lint --closing` and the auto-close guard
+    (FEAT-LOOP-2026-0249). Both forms are read in every mode. A missing or
+    unparseable changelog and a malformed fragment count as no entry; this
+    never raises.
+    """
+    from . import changelog_fragments
+    from .changelog import parse_changelog
+
+    root = Path(repo_root)
+    entries = list(changelog_fragments.fragment_entries(root))
+    changelog = root / CHANGELOG_PATH
+    if changelog.is_file():
+        try:
+            unreleased = parse_changelog(changelog.read_text(encoding="utf-8")).unreleased()
+        except Exception:  # noqa: BLE001 - a guard reports a gap, never crashes on one
+            unreleased = None
+        entries += unreleased.entries if unreleased else []
+    return changelog_has_entry_for(entries, feature_id)
+
+
 # --------------------------------------------------------------------------- #
 # Requirement records                                                         #
 # --------------------------------------------------------------------------- #
@@ -354,8 +384,8 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             description=(
                 f"When the '{CONSUMER_VISIBLE_HEADING}' section (close-discipline.md "
                 f"§3) is not the '{CONSUMER_VISIBLE_NA_PHRASE}' line, "
-                f"{CHANGELOG_PATH}'s Unreleased section gains an entry carrying "
-                "this feature's FEAT-ID — the same enumeration §3 already "
+                f"{CHANGELOG_PATH}'s Unreleased section or a valid changelog.d/ "
+                "fragment gains an entry carrying this feature's FEAT-ID — the same enumeration §3 already "
                 "requires, appended where a consumer reads it, not re-derived"
             ),
             file=RETROSPECTIVE_FILENAME,

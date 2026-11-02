@@ -17,9 +17,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests._loop_loader import REPO_ROOT
+from tests._loop_loader import REPO_ROOT, load_loop
+from tests.test_closing_deliverable_guard import DUMMY_HEAD, _make_wu
 
+from specfuse.loop import lint_closing as lc
 from specfuse.loop.changelog import parse_changelog
+from specfuse.loop.closing_requirements import CLOSING_REQUIREMENTS
+
+loop = load_loop()
 
 _SEED = "# Changelog\n\n## [Unreleased]\n\n## [0.1.0+umbrella.0.1.0] - 2026-01-01\n\n### Added\n\n- first (#1)\n"
 _GIT = ("git", "-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@example.com")
@@ -95,10 +100,117 @@ class TestClause1ConcurrentPrsDoNotConflict(unittest.TestCase):
             self.assertNotEqual(_add(root, trace="#1", summary="same").returncode, 0)
 
 
-@unittest.skip("T02 owns clause 2: one reader for close-k, lint --closing and the auto-close guard")
+_FEATURE = "FEAT-2026-9999"
+_RETRO = (
+    "# Retrospective\n\n## Consumer-visible contract changes\n\n"
+    "1. **New CLI flag `--foo`.** Additive.\n\n## Cost analysis\n\nCheap.\n"
+)
+
+
 class TestClause2GuardsReadFragments(unittest.TestCase):
-    def test_pending(self):
-        pass
+    """close-k, `lint --closing` and the auto-close guard all read one helper."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.fdir = self.root / "feature"
+        self.fdir.mkdir()
+        (self.fdir / "RETROSPECTIVE.md").write_text(_RETRO, encoding="utf-8")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _fragment(self, name: str, text: str) -> None:
+        (self.root / "changelog.d").mkdir(exist_ok=True)
+        (self.root / "changelog.d" / name).write_text(text, encoding="utf-8")
+
+    def _good(self, trace: str = _FEATURE) -> None:
+        self._fragment(
+            f"{trace.replace('/', '-')}-entry.md",
+            f"---\nclass: added\ntrace: {trace}\n---\nA new flag.\n",
+        )
+
+    def _verdicts(self) -> dict:
+        wu = _make_wu(file=self.fdir / "WU-close.md", wu_id=f"{_FEATURE}/G1-CLOSE")
+        close_k, close_k_reason = loop.assert_changelog_entry_for_contract_changes(
+            wu, self.fdir, self.root, DUMMY_HEAD
+        )
+        req = next(r for r in CLOSING_REQUIREMENTS["close"] if r.id == "close-k")
+        ctx = lc.ClosingContext(
+            feature_dir=self.fdir, repo_root=self.root, plan_fm={}, gates=[],
+            wu_id=f"{_FEATURE}/G1-CLOSE", wu_type="close", gate_num=1,
+            wfm={"verdict": "met"}, wbody="",
+        )
+        lint, lint_reason = lc._check_changelog_entry_for_contract_changes(req, ctx)
+        return {
+            "close-k": close_k,
+            "lint --closing": lint,
+            "auto-close guard": loop._unreleased_has_entry_for(self.root, _FEATURE),
+            "reasons": (close_k_reason, lint_reason),
+        }
+
+    def _assert_all(self, expected: bool) -> None:
+        verdicts = self._verdicts()
+        reasons = verdicts.pop("reasons")
+        for guard, got in verdicts.items():
+            with self.subTest(guard=guard):
+                self.assertEqual(got, expected, reasons)
+
+    def test_fragment_only_without_changelog_md_passes_every_guard(self):
+        self._good()
+        self._assert_all(True)
+
+    def test_fragment_for_a_sub_wu_of_the_feature_counts(self):
+        self._good(f"{_FEATURE}/T01")
+        self._assert_all(True)
+
+    def test_fragment_alongside_changelog_md_passes_every_guard(self):
+        (self.root / "CHANGELOG.md").write_text(_SEED, encoding="utf-8")
+        self._good()
+        self._assert_all(True)
+
+    def test_changelog_md_entry_still_passes_in_every_guard(self):
+        (self.root / "CHANGELOG.md").write_text(
+            f"## [Unreleased]\n\n### Added\n\n- a flag ({_FEATURE})\n", encoding="utf-8"
+        )
+        self._assert_all(True)
+
+    def test_no_entry_in_either_form_fails_every_guard(self):
+        (self.root / "CHANGELOG.md").write_text(_SEED, encoding="utf-8")
+        self._fragment(
+            "other.md", "---\nclass: added\ntrace: FEAT-2026-1111\n---\nOther.\n"
+        )
+        self._assert_all(False)
+
+    def test_neither_form_keeps_the_does_not_exist_message(self):
+        verdicts = self._verdicts()
+        self.assertFalse(verdicts["close-k"])
+        for reason in verdicts["reasons"]:
+            self.assertIn("does not exist", reason)
+
+    def test_malformed_fragments_do_not_count(self):
+        bad = {
+            "no-frontmatter.md": "A new flag.\n",
+            "unclosed.md": f"---\nclass: added\ntrace: {_FEATURE}\nA new flag.\n",
+            "bad-class.md": f"---\nclass: nope\ntrace: {_FEATURE}\n---\nA flag.\n",
+            "bad-trace.md": "---\nclass: added\ntrace: oops\n---\nA flag.\n",
+            "empty-body.md": f"---\nclass: added\ntrace: {_FEATURE}\n---\n",
+            "two-lines.md": f"---\nclass: added\ntrace: {_FEATURE}\n---\none\ntwo\n",
+        }
+        for name, text in bad.items():
+            self._fragment(name, text)
+        self._assert_all(False)
+
+    def test_refusals_name_both_locations(self):
+        (self.root / "CHANGELOG.md").write_text(_SEED, encoding="utf-8")
+        for reason in self._verdicts()["reasons"]:
+            self.assertIn("CHANGELOG.md", reason)
+            self.assertIn("changelog.d/", reason)
+        description = next(
+            r for r in CLOSING_REQUIREMENTS["close"] if r.id == "close-k"
+        ).description
+        self.assertIn("CHANGELOG.md", description)
+        self.assertIn("changelog.d/", description)
 
 
 @unittest.skip("T03 owns clause 3: collation at release")
