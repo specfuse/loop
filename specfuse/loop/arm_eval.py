@@ -110,6 +110,7 @@ JUDGE_MODULES = tuple(
         "closing_requirements.py",
         "criteria_state.py",
         "lint_closing.py",
+        "changelog_fragments.py",  # the one reader/writer of changelog entries the close guards read
         "lint_plan.py",
         "ids.py",                # supplies lint_plan's CORRELATION_ID_RE; an edit changes what the close's lint accepts
         "plan_baseline.py",      # the baseline retroactive_edits compares to

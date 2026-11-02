@@ -1,0 +1,2 @@
+- **FEAT-LOOP-2026-0249/T01**: Added changelog.mode to layout, new changelog_fragments writer (`add`), registered it as a judge module, and created the oracle with clause 1 and clause 5 writer half green.
+  - note: Fragment frontmatter is `class:`/`trace:` with the summary as body; `_TRACE_RE` is imported from changelog.py for validation. Clause 2/3/4 classes and the clause-5 release test are skipped, naming T02/T03/T04.
