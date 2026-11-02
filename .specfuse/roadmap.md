@@ -127,6 +127,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-LOOP-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-loop-2026-0246) |
 | FEAT-LOOP-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0247) |
 | FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
+| FEAT-LOOP-2026-0249 | Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md | planned | — | [→ detail](#feat-loop-2026-0249) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1054,6 +1055,17 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Goal.** Add a cost-denominated cap (e.g. `budgets.max_cost_usd_per_run`) budgeted on the `total_cost_usd` that `specfuse/agent/invoke.py` already parses from each session's envelope. The run summary reports the same dollar figure the cap is compared against. Existing `max_tokens_per_run` policies keep working, with a documented migration path; `derive-agent-policy`, `policy_proposals` and `policy_review` propose and review the new field.
 
 **Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
+
+**Status: planned.**
+
+<a id="feat-loop-2026-0249"></a>
+## FEAT-LOOP-2026-0249 — Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md
+
+**Why.** Every writer of CHANGELOG.md appends at one insertion point, so any two open PRs conflict as soon as one merges, and a conflicted PR gets no CI run; 62 of 75 commits on main since 2026-10-01 touch the file, and merge=union does not help because GitHub's merge button ignores merge drivers (#3563).
+
+**Goal.** An opt-in changelog.d/ fragment flow: a validating writer CLI used by /fix-bug and close-discipline §3, one shared reader so close-k, lint --closing and the terminal auto-close guard accept an entry in a fragment or CHANGELOG.md, a shipped collation step that release paths call before stamping, and PR-time fragment validation. One gate. Out of scope: roadmap and LEARNINGS conflicts on close PRs, FEAT-LOOP-2026-0201's release backstop, moving existing Unreleased entries, and any adopter's local override.
+
+**Benefits.** Concurrent PRs stop conflicting on the changelog; operators stop hand-rebasing it; adopters drop local overrides; projects that keep a single file see no change.
 
 **Status: planned.**
 
