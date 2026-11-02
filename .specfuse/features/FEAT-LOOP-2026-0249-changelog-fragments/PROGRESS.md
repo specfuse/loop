@@ -4,3 +4,4 @@
 - **FEAT-LOOP-2026-0249/T03**: Added `collate` subcommand plus `collate_text`/`remove_fragments` in changelog_fragments.py; `release()` folds fragments into Unreleased before `stamp_release`, deletes them only after writes succeed.
   - note: `collate_text` is pure (validates all fragments, parses result, writes nothing); `release()` deletes fragments last, so rejected stamp or invalid fragment leaves tree untouched. T04 clause 4 test still skipped.
 - **FEAT-LOOP-2026-0249/T04**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0249/T05**: attempt 1 outcome=passed

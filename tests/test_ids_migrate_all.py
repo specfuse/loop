@@ -183,6 +183,27 @@ class MigrateAll(unittest.TestCase):
             self.assertIn("new thing (FEAT-ACME-2026-0042)", changelog)
             self.assertIn("(FEAT-2026-0007)", changelog)
 
+    def test_fragment_trace_follows_rename(self):
+        # FEAT-LOOP-2026-0249/T05: a changelog.d/ fragment's `trace:` is rewritten
+        # without --include-prose; the filename stays, `check` still passes.
+        from specfuse.loop import changelog_fragments
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _make(tmp)
+            frag = root / "changelog.d" / "FEAT-2026-0042-new-thing.md"
+            frag.parent.mkdir()
+            frag.write_text("---\nclass: added\ntrace: FEAT-2026-0042\n---\nnew thing\n")
+            _git(root, "add", "-A")
+            _git(root, "commit", "-q", "-m", "fragment")
+            code, _, err = _run(root, "--apply")
+            self.assertEqual(code, 0, err)
+            self.assertIn("trace: FEAT-ACME-2026-0042\n", frag.read_text())
+            self.assertEqual(
+                [p.name for p in (root / "changelog.d").iterdir()],
+                ["FEAT-2026-0042-new-thing.md"],
+            )
+            self.assertEqual(changelog_fragments.invalid_fragments(root), [])
+
     def test_structural_only_when_folder_exists(self):
         # T02: `<ID>-<slug>` is structural only when .specfuse/features/<ID>-<slug>
         # exists; a `features/<ID>-fixture` path with no such folder is prose.

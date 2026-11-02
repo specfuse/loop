@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0249/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 produces:
@@ -11,6 +11,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.31.1
+started_at: 2026-11-02T16:13:55.965709+00:00
+duration_seconds: 49.392
+cost_usd: 0.193922
+input_tokens: 14
+output_tokens: 2843
 ---
 
 # T05 — ids migrate follows fragment traces
