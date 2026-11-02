@@ -88,6 +88,12 @@ code:
     tier: broad
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
+  - name: changelog-fragments
+    # FEAT-LOOP-2026-0249/T04: a malformed changelog.d/ fragment fails at PR
+    # time, with the same validation `collate` applies at release. An absent
+    # directory passes.
+    command: "python3 -m specfuse.loop.changelog_fragments check"
+
   - name: agent-policy-example-lint
     # FEAT-2026-0044/T02: validate_agent_policy over both the shipped example
     # and this repo's live policy, now that `.specfuse/agent-policy.yml`

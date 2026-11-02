@@ -320,10 +320,50 @@ class TestClause3CollateAtRelease(unittest.TestCase):
         self.assertEqual(len(result.unreleased().entries), 3)
 
 
-@unittest.skip("T04 owns clause 4: the check gate")
+def _check(repo: Path) -> subprocess.CompletedProcess:
+    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+    return subprocess.run(
+        [sys.executable, "-m", "specfuse.loop.changelog_fragments",
+         "--repo", str(repo), "check"],
+        capture_output=True, text=True, env=env, check=False,
+    )
+
+
 class TestClause4CheckGate(unittest.TestCase):
-    def test_pending(self):
-        pass
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+        (self.root / "changelog.d").mkdir()
+
+    def _write(self, name: str, text: str) -> None:
+        (self.root / "changelog.d" / name).write_text(text, encoding="utf-8")
+
+    def _assert_rejected(self, name: str, text: str) -> None:
+        self._write(name, text)
+        done = _check(self.root)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn(name, done.stderr)
+
+    def test_wrong_class_fails_naming_file(self):
+        self._assert_rejected("a.md", "---\nclass: bogus\ntrace: #1\n---\nsummary\n")
+
+    def test_bad_trace_fails_naming_file(self):
+        self._assert_rejected("b.md", "---\nclass: added\ntrace: nonsense\n---\nsummary\n")
+
+    def test_missing_frontmatter_fails_naming_file(self):
+        self._assert_rejected("c.md", "just a summary\n")
+
+    def test_multi_line_body_fails_naming_file(self):
+        self._assert_rejected("d.md", "---\nclass: added\ntrace: #1\n---\none\ntwo\n")
+
+    def test_valid_fragments_pass(self):
+        self._write("ok.md", "---\nclass: added\ntrace: #1\n---\nsummary\n")
+        self.assertEqual(_check(self.root).returncode, 0)
+
+    def test_absent_directory_passes(self):
+        (self.root / "changelog.d").rmdir()
+        self.assertEqual(_check(self.root).returncode, 0)
 
 
 class TestClause5NoModeKeyBehavesAsBefore(unittest.TestCase):

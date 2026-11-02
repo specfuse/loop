@@ -11,6 +11,7 @@ to `CHANGELOG.md` through `changelog.append_entry`.
 
     python3 -m specfuse.loop.changelog_fragments add --class C --trace T --summary S [--repo DIR]
     python3 -m specfuse.loop.changelog_fragments collate [--repo DIR]
+    python3 -m specfuse.loop.changelog_fragments check [--repo DIR]
 """
 
 from __future__ import annotations
@@ -121,6 +122,18 @@ def add(repo_root, *, entry_class: str, trace: str, summary: str) -> Path:
     return path
 
 
+def invalid_fragments(repo_root) -> list:
+    """One message per malformed fragment under `changelog.d/`, each naming the file."""
+    directory = Path(repo_root) / FRAGMENT_DIR
+    paths = sorted(directory.glob("*.md")) if directory.is_dir() else []
+    return [
+        f"{FRAGMENT_DIR}/{path.name} is not a valid fragment — expected "
+        "`class:` and `trace:` frontmatter and a single-line summary"
+        for path in paths
+        if read_fragment(path) is None
+    ]
+
+
 def collate_text(repo_root, text: str) -> tuple:
     """Fold every fragment into `text`'s `Unreleased`; return `(new_text, fragment_paths)`.
 
@@ -130,12 +143,9 @@ def collate_text(repo_root, text: str) -> tuple:
     """
     directory = Path(repo_root) / FRAGMENT_DIR
     paths = sorted(directory.glob("*.md")) if directory.is_dir() else []
-    for path in paths:
-        if read_fragment(path) is None:
-            raise ValueError(
-                f"{FRAGMENT_DIR}/{path.name} is not a valid fragment — expected "
-                "`class:` and `trace:` frontmatter and a single-line summary"
-            )
+    problems = invalid_fragments(repo_root)
+    if problems:
+        raise ValueError(problems[0])
     for path in paths:
         entry = read_fragment(path)
         text = append_entry(
@@ -186,7 +196,14 @@ def main(argv=None) -> int:
     addp.add_argument("--trace", required=True)
     addp.add_argument("--summary", required=True)
     sub.add_parser("collate", help="fold changelog.d/ fragments into CHANGELOG.md and delete them")
+    sub.add_parser("check", help="fail when any changelog.d/ fragment is malformed")
     args = parser.parse_args(argv)
+
+    if args.command == "check":
+        problems = invalid_fragments(args.repo)
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        return 2 if problems else 0
 
     if args.command == "collate":
         try:

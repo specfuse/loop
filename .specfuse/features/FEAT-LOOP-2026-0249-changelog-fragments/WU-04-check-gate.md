@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0249/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 produces:
@@ -12,6 +12,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.31.1
+started_at: 2026-11-02T16:13:22.446147+00:00
+duration_seconds: 33.062
+cost_usd: 0.182498
+input_tokens: 10
+output_tokens: 2848
 ---
 
 # T04 — PR-time fragment check
