@@ -294,6 +294,8 @@ def release(
     changelog_path.write_text(stamped, encoding="utf-8")
     _fragments.remove_fragments(fragment_paths)
     changed.append("CHANGELOG.md")
+    # Reported so a caller staging this list also records the deletions.
+    changed.extend(path.relative_to(root).as_posix() for path in fragment_paths)
     return changed
 
 

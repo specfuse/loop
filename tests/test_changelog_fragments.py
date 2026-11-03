@@ -268,6 +268,17 @@ class TestClause3CollateAtRelease(unittest.TestCase):
         self.assertEqual(result.unreleased().entries, [])
         self.assertEqual(list((self.root / "changelog.d").glob("*.md")) if (self.root / "changelog.d").exists() else [], [])
 
+    def test_release_reports_each_removed_fragment(self):
+        self._fragments()
+        removed = sorted(
+            path.relative_to(self.root).as_posix()
+            for path in (self.root / "changelog.d").glob("*.md")
+        )
+        self.assertEqual(len(removed), 3)
+        changed = self.bump.release(self.root, "0.2.0", "0.2.0", date="2026-11-02")
+        for path in removed:
+            self.assertIn(path, changed)
+
     def test_collation_runs_whatever_the_mode(self):
         self._fragments("fragments")
         (self.root / ".specfuse" / "layout.yml").write_text(
