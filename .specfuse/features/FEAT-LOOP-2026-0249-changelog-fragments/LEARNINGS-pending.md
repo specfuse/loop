@@ -22,3 +22,5 @@ staged no new entry. The entry below was added by the operator's session at wrap
   previously uncalled code, name the ratchet update in its acceptance and run
   `tests.test_caller_check_ratchet` in its verification; a green narrow tier does not cover
   repo-wide ratchets.
+
+  > **Accepted 2026-11-03** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0249/T01]`.

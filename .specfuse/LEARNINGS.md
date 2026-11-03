@@ -4640,3 +4640,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   running process, so a rehearsal was judged by the real checkout's modules, whose
   exemption table still held the old folder names, and failed falsely (T06). Run such a
   check as a subprocess with `cwd` and `PYTHONPATH` set to the tree it judges.
+
+- [FEAT-LOOP-2026-0249/T01] **A unit that gives a function its first production caller must
+  drop that function from the caller-check ratchet's `BASELINE` in the same unit.** T01 made
+  `append_entry` a real caller target, which shrank the baseline, and
+  `test_the_baseline_has_not_silently_shrunk` went red. Its narrow tier did not select that
+  repo-wide test, so T01 passed and the failure surfaced at T06's baseline probe, attributed to
+  T06, as a `preexisting_gate_failure` halt that needed a human. Rule: when a unit wires up
+  previously uncalled code, name the ratchet update in its acceptance and run
+  `tests.test_caller_check_ratchet` in its verification; a green narrow tier does not cover
+  repo-wide ratchets.
