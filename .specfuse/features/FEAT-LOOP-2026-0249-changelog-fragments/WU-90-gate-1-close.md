@@ -1,7 +1,7 @@
 ---
 id: FEAT-LOOP-2026-0249/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
@@ -9,6 +9,19 @@ auto_close_disabled: true
 model: sonnet
 effort: high
 gate_set: plannext
+judge_edit_acknowledged:
+  paths:
+    - .specfuse/rules/close-discipline.md
+    - .specfuse/verification.yml
+    - produces_driver_helper
+    - specfuse/loop/arm_eval.py
+    - specfuse/loop/changelog_fragments.py
+    - specfuse/loop/closing_requirements.py
+    - specfuse/loop/data/rules/close-discipline.md
+    - specfuse/loop/ids.py
+    - specfuse/loop/lint_closing.py
+    - specfuse/loop/loop.py
+  reason: "guards not weakened, single-file behavior unchanged"
 ---
 
 # G1-CLOSE — terminal close
