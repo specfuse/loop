@@ -151,14 +151,14 @@ class TestTheDecisionModulesAreStillCovered(unittest.TestCase):
 
         Issue #240's fix touched `specfuse/loop/loop.py` -- a real judge, and
         still declined. Issue #795's touched `specfuse/loop/gate_eval.py`, also
-        a real judge. But a fix to notification, liveness, changelog or
+        a real judge. But a fix to notification, liveness, label or
         escalation-rendering code was blocked by the same prefix while
         deciding nothing, and that class is now free.
         """
         for module in (
             "specfuse/loop/notify.py",
             "specfuse/loop/heartbeat.py",
-            "specfuse/loop/changelog.py",
+            "specfuse/loop/labels.py",
             "specfuse/loop/escalation.py",
         ):
             with self.subTest(module=module):

@@ -43,6 +43,24 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-loop-2026-0249"></a>
+## FEAT-LOOP-2026-0249 — Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md
+
+**Why.** Every writer of CHANGELOG.md appends at one insertion point, so any two open PRs conflict as soon as one merges, and a conflicted PR gets no CI run; 62 of 75 commits on main since 2026-10-01 touch the file, and merge=union does not help because GitHub's merge button ignores merge drivers (#3563).
+
+**Goal.** An opt-in changelog.d/ fragment flow: a validating writer CLI used by /fix-bug and close-discipline §3, one shared reader so close-k, lint --closing and the terminal auto-close guard accept an entry in a fragment or CHANGELOG.md, a shipped collation step that release paths call before stamping, and PR-time fragment validation. One gate. Out of scope: roadmap and LEARNINGS conflicts on close PRs, FEAT-LOOP-2026-0201's release backstop, moving existing Unreleased entries, and any adopter's local override.
+
+**Benefits.** Concurrent PRs stop conflicting on the changelog; operators stop hand-rebasing it; adopters drop local overrides; projects that keep a single file see no change.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- Open two real PRs that each add a fragment and merge one. Confirm GitHub does not mark the
+  other as conflicting. The oracle uses real `git merge`, not GitHub's merge button.
+- Decide FEAT-LOOP-2026-0200's optional append-only re-apply: fragments make it unnecessary
+  for the changelog.
+
 <a id="feat-loop-2026-0248"></a>
 ## FEAT-LOOP-2026-0248 — Make `ids migrate --all` safe on a real repository
 

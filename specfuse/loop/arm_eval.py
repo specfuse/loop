@@ -110,6 +110,8 @@ JUDGE_MODULES = tuple(
         "closing_requirements.py",
         "criteria_state.py",
         "lint_closing.py",
+        "changelog.py",          # its parser is how close-k, lint --closing and the auto-close guard read Unreleased
+        "changelog_fragments.py",  # the one reader/writer of changelog entries the close guards read
         "lint_plan.py",
         "ids.py",                # supplies lint_plan's CORRELATION_ID_RE; an edit changes what the close's lint accepts
         "plan_baseline.py",      # the baseline retroactive_edits compares to
@@ -144,7 +146,6 @@ NON_JUDGE_MODULES = {
     "caller_check.py": "reports public symbols whose only callers are "
         "tests; a hygiene report, grants no verdict and no arm/close/"
         "merge decision reads it",
-    "changelog.py": "parses and stamps CHANGELOG.md; no gate reads it",
     "decisions_format.py": "parses DECISIONS.md into entries; not on the "
         "arm/close/merge judge path — T02/T03 own the lint that reads it",
     "driver_edit.py": "applies operator edits to a feature folder",

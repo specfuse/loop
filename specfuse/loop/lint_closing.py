@@ -28,7 +28,6 @@ from pathlib import Path
 from . import closing_requirements as creq
 from . import criteria_state
 from ._wu_sections import slice_wu_section
-from .changelog import parse_changelog
 from .judge import MEASUREMENTS_SECTION
 from .loop import (
     _gate_number_from_wu_id,
@@ -293,22 +292,18 @@ def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: Clos
         return True, ""
     if creq.consumer_visible_section_is_na(section):
         return True, ""
-    changelog = ctx.repo_root / creq.CHANGELOG_PATH
-    if not changelog.exists():
+    feature_id = ctx.wu_id.rsplit("/", 1)[0]
+    if creq.changelog_has_entry_for_feature(ctx.repo_root, feature_id):
+        return True, ""
+    if not creq.changelog_exists(ctx.repo_root):
         return False, (
             f"'{creq.CONSUMER_VISIBLE_HEADING}' names a real change but "
             f"{creq.CHANGELOG_PATH} does not exist"
         )
-    result = parse_changelog(changelog.read_text())
-    unreleased = result.unreleased()
-    feature_id = ctx.wu_id.rsplit("/", 1)[0]
-    entries = unreleased.entries if unreleased else []
-    if creq.changelog_has_entry_for(entries, feature_id):
-        return True, ""
     return False, (
-        f"'{creq.CONSUMER_VISIBLE_HEADING}' names a real change but "
-        f"{creq.CHANGELOG_PATH}'s Unreleased section has no entry tracing to "
-        f"{feature_id}"
+        f"'{creq.CONSUMER_VISIBLE_HEADING}' names a real change but neither "
+        f"{creq.CHANGELOG_PATH}'s Unreleased section nor a valid changelog.d/ "
+        f"fragment has an entry tracing to {feature_id}"
     )
 
 

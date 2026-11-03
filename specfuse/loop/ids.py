@@ -399,7 +399,10 @@ def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
     is_changelog = rel == "CHANGELOG.md"
     lines = text.splitlines(keepends=True)
     bare = [ln.rstrip("\r\n") for ln in lines]
-    fm_end = _frontmatter_end(bare) if is_md and in_features else -1
+    # A changelog.d/ fragment is unreleased by definition: its `trace:` frontmatter
+    # is structural, so it follows the rename (the filename stays; frontmatter wins).
+    is_fragment = is_md and rel.startswith("changelog.d/")
+    fm_end = _frontmatter_end(bare) if is_md and (in_features or is_fragment) else -1
     graph = _task_graph_lines(bare) if name == "PLAN.md" and in_features else set()
     span = _unreleased_span(bare) if is_changelog else None
     if is_changelog and span is None:

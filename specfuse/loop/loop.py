@@ -66,7 +66,7 @@ from . import _wu_sections
 from . import criteria_state
 from . import ids as _ids
 from . import scaffold as _scaffold
-from .changelog import ENTRY_CLASSES, parse_changelog
+from .changelog import ENTRY_CLASSES
 from .closing_requirements import (
     CHANGELOG_PATH,
     CONSUMER_VISIBLE_HEADING,
@@ -89,7 +89,8 @@ from .closing_requirements import (
     ROADMAP_PATH,
     VERDICT_MIGRATION_NOTE,
     VERDICT_VALUES,
-    changelog_has_entry_for,
+    changelog_exists,
+    changelog_has_entry_for_feature,
     consumer_visible_section_is_na,
     find_consumer_visible_section,
     find_post_merge_checklist_section,
@@ -9372,20 +9373,12 @@ def resolve_auto_close_override(
 
 
 def _unreleased_has_entry_for(repo_root: Path, feature_id: str) -> bool:
-    """Whether `CHANGELOG.md`'s Unreleased section traces to *feature_id* (#3448).
+    """Whether `CHANGELOG.md`'s Unreleased section or a valid fragment traces to *feature_id* (#3448).
 
     A missing or unparseable changelog counts as no entry: the caller then
     dispatches the full close, which is where that gap is reported.
     """
-    changelog = repo_root / CHANGELOG_PATH
-    if not changelog.is_file():
-        return False
-    try:
-        unreleased = parse_changelog(changelog.read_text()).unreleased()
-    except Exception:  # noqa: BLE001 - fall back to the close, never crash the gate
-        return False
-    entries = unreleased.entries if unreleased else []
-    return changelog_has_entry_for(entries, feature_id)
+    return changelog_has_entry_for_feature(repo_root, feature_id)
 
 
 def maybe_auto_close_terminal(
@@ -10569,29 +10562,27 @@ def assert_changelog_entry_for_contract_changes(
         return True, ""
     if consumer_visible_section_is_na(section):
         return True, ""
-    changelog = repo_root / CHANGELOG_PATH
-    if not changelog.exists():
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+    if changelog_has_entry_for_feature(repo_root, feature_id):
+        return True, ""
+    if not changelog_exists(repo_root):
         return (
             False,
             f"assert_changelog_entry_for_contract_changes: '{CONSUMER_VISIBLE_HEADING}' "
             f"names a real change but {CHANGELOG_PATH} does not exist. Create it at "
             f"the repo root with a '## [Unreleased]' heading, then append this "
             f"feature's enumeration under one of: "
-            f"{', '.join(sorted(ENTRY_CLASSES))}. Projects scaffolded before "
-            f"{CHANGELOG_PATH} was seeded will not have one; `specfuse upgrade` "
+            f"{', '.join(sorted(ENTRY_CLASSES))}; or, in a project with "
+            f"`changelog.mode: fragments`, write a fragment with "
+            f"`python3 -m specfuse.loop.changelog_fragments add`. Projects scaffolded "
+            f"before {CHANGELOG_PATH} was seeded will not have one; `specfuse upgrade` "
             f"creates it without touching an existing file (#575)",
         )
-    result = parse_changelog(changelog.read_text())
-    unreleased = result.unreleased()
-    feature_id = wu.wu_id.rsplit("/", 1)[0]
-    entries = unreleased.entries if unreleased else []
-    if changelog_has_entry_for(entries, feature_id):
-        return True, ""
     return (
         False,
         f"assert_changelog_entry_for_contract_changes: '{CONSUMER_VISIBLE_HEADING}' "
-        f"names a real change but {CHANGELOG_PATH}'s Unreleased section has no "
-        f"entry tracing to {feature_id}",
+        f"names a real change but neither {CHANGELOG_PATH}'s Unreleased section nor "
+        f"a valid changelog.d/ fragment has an entry tracing to {feature_id}",
     )
 
 

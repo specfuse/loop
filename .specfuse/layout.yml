@@ -1,2 +1,4 @@
 ids:
   key: LOOP
+changelog:
+  mode: fragments

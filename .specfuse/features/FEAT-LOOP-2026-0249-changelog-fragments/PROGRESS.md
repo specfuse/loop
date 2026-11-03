@@ -1,0 +1,11 @@
+- **FEAT-LOOP-2026-0249/T01**: Added changelog.mode to layout, new changelog_fragments writer (`add`), registered it as a judge module, and created the oracle with clause 1 and clause 5 writer half green.
+  - note: Fragment frontmatter is `class:`/`trace:` with the summary as body; `_TRACE_RE` is imported from changelog.py for validation. Clause 2/3/4 classes and the clause-5 release test are skipped, naming T02/T03/T04.
+- **FEAT-LOOP-2026-0249/T02**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0249/T03**: Added `collate` subcommand plus `collate_text`/`remove_fragments` in changelog_fragments.py; `release()` folds fragments into Unreleased before `stamp_release`, deletes them only after writes succeed.
+  - note: `collate_text` is pure (validates all fragments, parses result, writes nothing); `release()` deletes fragments last, so rejected stamp or invalid fragment leaves tree untouched. T04 clause 4 test still skipped.
+- **FEAT-LOOP-2026-0249/T04**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0249/T05**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0249/T06**: attempt 2 outcome=passed
+- **FEAT-LOOP-2026-0249/T07**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0249/T07**: attempt 2 outcome=passed
+- **FEAT-LOOP-2026-0249/G1-CLOSE**: attempt 1 outcome=passed

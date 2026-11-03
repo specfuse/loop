@@ -41,11 +41,14 @@ _STYLE_DEFAULTS = {
 }
 _FALLBACK_DEFAULTS = _STYLE_DEFAULTS["adr"]
 
-KEYS = ("decisions.style", "decisions.location", "decisions.link", "ids.key")
+KEYS = ("decisions.style", "decisions.location", "decisions.link", "ids.key", "changelog.mode")
+
+DEFAULT_CHANGELOG_MODE = "single"
+VALID_CHANGELOG_MODES = ("single", "fragments")
 
 VALID_STYLES = ("adr", "entries")
 LINK_PLACEHOLDERS = ("location", "path", "id", "domain")
-KNOWN_TOP_LEVEL = ("decisions", "ids")
+KNOWN_TOP_LEVEL = ("decisions", "ids", "changelog")
 _PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
@@ -63,9 +66,15 @@ class Ids:
 
 
 @dataclass(frozen=True)
+class Changelog:
+    mode: str = DEFAULT_CHANGELOG_MODE
+
+
+@dataclass(frozen=True)
 class Layout:
     decisions: Decisions
     ids: Ids = Ids()
+    changelog: Changelog = Changelog()
 
 
 def _normalise(location: str) -> str:
@@ -104,9 +113,12 @@ def load(repo_root) -> Layout:
     block = data.get("decisions") if isinstance(data, dict) else None
     ids_block = data.get("ids") if isinstance(data, dict) else None
     key = ids_block.get("key") if isinstance(ids_block, dict) else None
+    cl_block = data.get("changelog") if isinstance(data, dict) else None
+    mode = cl_block.get("mode") if isinstance(cl_block, dict) else None
     return Layout(
         decisions=_resolve_decisions(block if isinstance(block, dict) else None),
         ids=Ids(key=None if key is None else str(key)),
+        changelog=Changelog(mode=DEFAULT_CHANGELOG_MODE if mode is None else str(mode)),
     )
 
 
@@ -166,6 +178,17 @@ def validate(repo_root) -> list:
                 "key",
                 f"ids.key {key!r} is invalid; must match {KEY_PATTERN} "
                 "(2-6 characters, upper-case letters and digits, starting with a letter)",
+            )
+
+    cl_block = data.get("changelog")
+    if isinstance(cl_block, dict) and cl_block.get("mode") is not None:
+        mode = str(cl_block["mode"])
+        if mode not in VALID_CHANGELOG_MODES:
+            add(
+                SEVERITY_ERROR,
+                "mode",
+                f"changelog.mode {mode!r} is invalid; must be one of "
+                f"{VALID_CHANGELOG_MODES[0]!r} or {VALID_CHANGELOG_MODES[1]!r}",
             )
 
     block = data.get("decisions")
@@ -239,6 +262,8 @@ def get(layout: Layout, key: str) -> str:
         raise KeyError(key)
     if key == "ids.key":
         return layout.ids.key or ""
+    if key == "changelog.mode":
+        return layout.changelog.mode
     return getattr(layout.decisions, key.split(".", 1)[1])
 
 

@@ -138,18 +138,19 @@ A close carrying this obligation is always load-bearing
 (`auto_close_disabled: true`).
 
 **Also append it to `CHANGELOG.md`'s `Unreleased` section (FEAT-2026-0064).**
-When this section is a real enumeration — not the `n/a` line — the close
-appends each item to `Unreleased`, classified `added` / `changed` / `fixed` /
-`breaking` and carrying the feature's `FEAT-YYYY-NNNN` ID, via
-`specfuse/loop/changelog.py`'s schema. **This is the same material the
+When this section is a real enumeration — not the `n/a` line — run one
+`python3 -m specfuse.loop.changelog_fragments add --class <class> --trace <FEAT-ID> --summary '<line>'`
+per enumerated item, classified `added` / `changed` / `fixed` / `breaking`,
+with the feature's `FEAT-YYYY-NNNN` ID as trace. Never hand-edit; `add`
+routes by the project's `changelog.mode`. **This is the same material the
 paragraph above already requires you to write, put where a consumer will
 read it — not a second write.** An author who treats the changelog append as
 new work will write the enumeration twice, badly; write it once, in both
 places, from the same understanding. `closing_requirements.py`'s `close-k`
 requirement (enforced by `assert_changelog_entry_for_contract_changes` in
 `loop.py`, and pre-squash by `specfuse lint --closing`) fires when this
-section names a real change and `Unreleased` gained no entry tracing to this
-feature's FEAT-ID.
+section names a real change and no entry tracing to this feature's FEAT-ID
+lives in `CHANGELOG.md` or a `changelog.d/` fragment.
 
 **An `n/a` close appends nothing to `Unreleased`, and that is correct.** A
 changelog padded with "no user-facing change" entries is noise that trains
