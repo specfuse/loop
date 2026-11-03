@@ -6,7 +6,8 @@
 """Project layout resolver — FEAT-2026-0224 (project-configurable layout).
 
 Reads an optional `.specfuse/layout.yml` and answers `layout get <key>` for
-`decisions.style`, `decisions.location`, `decisions.link` and `ids.key`.
+`decisions.style`, `decisions.location`, `decisions.link`, `decisions.entryKey`
+and `ids.key`.
 
 Contract: no file (or no `decisions:` block) means today's behaviour — style
 `adr`, location `docs/adr`, link `{path}`. An `entries` style with `location`
@@ -41,7 +42,14 @@ _STYLE_DEFAULTS = {
 }
 _FALLBACK_DEFAULTS = _STYLE_DEFAULTS["adr"]
 
-KEYS = ("decisions.style", "decisions.location", "decisions.link", "ids.key", "changelog.mode")
+KEYS = (
+    "decisions.style",
+    "decisions.location",
+    "decisions.link",
+    "decisions.entryKey",
+    "ids.key",
+    "changelog.mode",
+)
 
 DEFAULT_CHANGELOG_MODE = "single"
 VALID_CHANGELOG_MODES = ("single", "fragments")
@@ -50,6 +58,7 @@ VALID_STYLES = ("adr", "entries")
 LINK_PLACEHOLDERS = ("location", "path", "id", "domain")
 KNOWN_TOP_LEVEL = ("decisions", "ids", "changelog")
 _PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
+_ENTRY_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
@@ -58,6 +67,7 @@ class Decisions:
     style: str
     location: str
     link: str
+    entry_key: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -90,10 +100,12 @@ def _resolve_decisions(block: Optional[dict]) -> Decisions:
     default_location, default_link = _STYLE_DEFAULTS.get(style, _FALLBACK_DEFAULTS)
     location = block.get("location")
     link = block.get("link")
+    entry_key = block.get("entryKey")
     return Decisions(
         style=style,
         location=default_location if location is None else _normalise(str(location)),
         link=default_link if link is None else str(link),
+        entry_key=None if entry_key is None else str(entry_key),
     )
 
 
@@ -250,6 +262,18 @@ def validate(repo_root) -> list:
                     f"decisions.link placeholder '{{{name}}}' is not allowed; "
                     "use {location}, {path}, {id} or {domain}",
                 )
+
+    entry_key = block.get("entryKey")
+    if entry_key is not None:
+        if not _ENTRY_KEY_RE.match(str(entry_key)):
+            add(
+                SEVERITY_ERROR,
+                "entryKey",
+                f"decisions.entryKey {str(entry_key)!r} is invalid; must match "
+                f"{_ENTRY_KEY_RE.pattern}",
+            )
+        if style is None or str(style) != "entries":
+            add(SEVERITY_ERROR, "entryKey", "decisions.entryKey applies only to style 'entries'")
     return findings
 
 
@@ -264,6 +288,8 @@ def get(layout: Layout, key: str) -> str:
         return layout.ids.key or ""
     if key == "changelog.mode":
         return layout.changelog.mode
+    if key == "decisions.entryKey":
+        return layout.decisions.entry_key or ""
     return getattr(layout.decisions, key.split(".", 1)[1])
 
 

@@ -44,6 +44,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
+import json
 import re
 
 from specfuse.loop import ids as _ids
@@ -160,6 +161,7 @@ def _find_anchors(lines):
     return anchors
 
 
+_ENTRY_FILE_SUFFIXES = (".yaml", ".yml", ".json")
 _EXPLICIT_ANCHOR_RE = re.compile(r'<a\s+(?:id|name)\s*=\s*"([^"]+)"', re.IGNORECASE)
 _MD_HEADING_RE = re.compile(r'^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$')
 
@@ -191,6 +193,58 @@ def _collect_anchor_names(text: str) -> set:
             seen[slug] = n + 1
             names.add(slug if n == 0 else f"{slug}-{n}")
     return names
+
+
+def _json_entry_ids(value, entry_key: str) -> set:
+    """Every scalar `entry_key` value in a parsed JSON document, at any depth."""
+    ids = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == entry_key and isinstance(item, (str, int)) and not isinstance(item, bool):
+                ids.add(str(item))
+            ids |= _json_entry_ids(item, entry_key)
+    elif isinstance(value, list):
+        for item in value:
+            ids |= _json_entry_ids(item, entry_key)
+    return ids
+
+
+def _collect_entry_ids(path: Path, entry_key: str):
+    """Ids a YAML or JSON decision file answers to, or None when it cannot be read (#3567).
+
+    YAML is scanned by line rather than parsed: `_miniyaml` refuses block scalars
+    and flow mappings by design, and decision files hold long rationale. A line
+    inside a block scalar that looks like the key therefore counts as an id, which
+    can only let a typo pass, never fail a good link.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".json":
+            return _json_entry_ids(json.loads(text), entry_key)
+    except (OSError, UnicodeDecodeError, ValueError):
+        return None
+    line_re = re.compile(
+        rf"""^\s*(?:-\s+)*["']?{re.escape(entry_key)}["']?\s*:\s+"""
+        r"""(?:"([^"]*)"|'([^']*)'|([^\s#"'][^#]*?))\s*(?:\#.*)?$"""
+    )
+    ids = set()
+    for line in text.splitlines():
+        m = line_re.match(line)
+        if m:
+            ids.add(next(group for group in m.groups() if group is not None))
+    return ids
+
+
+def _entry_anchor_problem(target: Path, link_path: str, fragment: str, entry_key: str):
+    """Why `fragment` does not resolve in a YAML or JSON decision file, or None."""
+    ids = _collect_entry_ids(target, entry_key)
+    if ids is None:
+        return f"'{link_path}', which could not be read as YAML or JSON"
+    if not ids:
+        return f"'{link_path}', which has no entries under entryKey '{entry_key}'"
+    if fragment not in ids:
+        return f"'{link_path}', which has no anchor '{fragment}'"
+    return None
 
 
 def _declared_decisions_location(repo_root: Path):
@@ -419,6 +473,7 @@ def _find_blocked_by(section, lines):
 def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows, repo_root: Path) -> list:
     findings = []
     declared_location = _declared_decisions_location(repo_root)
+    entry_key = _layout.load(repo_root).decisions.entry_key
     roadmap_sections = _detail_sections(roadmap_doc.lines)
     archive_sections = _detail_sections(archive_doc.lines)
 
@@ -487,6 +542,16 @@ def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows, repo_r
                             SEVERITY_ERROR, doc.filename, blocked_by_line + 1,
                             f"{row['id']}'s Blocked-by link '{href}' points at "
                             f"'{link_path}', which has no anchor '{fragment}'",
+                        ))
+                elif (
+                    fragment and entry_key and target.is_file()
+                    and target.suffix in _ENTRY_FILE_SUFFIXES
+                ):
+                    problem = _entry_anchor_problem(target, link_path, fragment, entry_key)
+                    if problem:
+                        findings.append(Finding(
+                            SEVERITY_ERROR, doc.filename, blocked_by_line + 1,
+                            f"{row['id']}'s Blocked-by link '{href}' points at {problem}",
                         ))
                 if declared_location is not None:
                     location = (repo_root / declared_location).resolve()
