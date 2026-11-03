@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0249/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -22,6 +22,13 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_closing.py
     - specfuse/loop/loop.py
   reason: "guards not weakened, single-file behavior unchanged"
+driver_version: 0.31.1
+started_at: 2026-11-03T13:06:22.977425+00:00
+verdict: met
+duration_seconds: 198.085
+cost_usd: 0.951093
+input_tokens: 48
+output_tokens: 18995
 ---
 
 # G1-CLOSE — terminal close
