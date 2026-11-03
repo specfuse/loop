@@ -5,7 +5,7 @@ slug: changelog-fragments
 branch: feat/FEAT-LOOP-2026-0249-changelog-fragments
 roadmap_goal: Two open PRs that each add a changelog entry no longer conflict when one merges, in any project that opts in, and every entry still reaches the released section.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 20.50
 ---
 
