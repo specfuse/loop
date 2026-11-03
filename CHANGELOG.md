@@ -26,6 +26,26 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.32.0+umbrella.0.17.0] - 2026-11-03
+
+### Fixed
+
+- The roadmap lint checks a Blocked-by fragment into a YAML or JSON decision file when `decisions.entryKey` names the key holding each entry id; without the key, behavior is unchanged. (#3567)
+
+### Changed
+
+- close-discipline §3 and `/fix-bug` tell agents to run `changelog_fragments add` instead of hand-editing `CHANGELOG.md`. (FEAT-LOOP-2026-0249)
+- `ids migrate --all --apply` rewrites the `trace` of a `changelog.d/` fragment to the new ID; filenames are left unchanged. (FEAT-LOOP-2026-0249)
+- `scripts/bump_version.py` `release()` folds `changelog.d/` fragments into `Unreleased` before stamping and removes them afterward, all-or-nothing; adopter release scripts must call `collate` before stamping. (FEAT-LOOP-2026-0249)
+- The `close-k` requirement, `specfuse lint --closing` and the terminal auto-close guard accept an entry in `CHANGELOG.md` or a valid `changelog.d/` fragment through one shared reader; refusals name both locations. (FEAT-LOOP-2026-0249)
+
+### Added
+
+- In `fragments` mode each entry is a `changelog.d/<trace>-<slug>.md` file (`class` and `trace` in frontmatter, one-line body), so concurrent PRs no longer conflict on `CHANGELOG.md`. (FEAT-LOOP-2026-0249)
+- New `changelog-fragments` verification gate runs `changelog_fragments check` and fails on a malformed fragment at PR time; adopters add the same gate to their own `verification.yml`. (FEAT-LOOP-2026-0249)
+- New `changelog.mode: single | fragments` key in `.specfuse/layout.yml`; absent means `single`, any other value fails `layout validate`. (FEAT-LOOP-2026-0249)
+- New `python3 -m specfuse.loop.changelog_fragments` CLI with `add`, `collate` and `check` subcommands; `add` is the one writer and routes by `changelog.mode`. (FEAT-LOOP-2026-0249)
+
 ## [0.31.1+umbrella.0.17.0] - 2026-10-30
 
 ### Fixed
