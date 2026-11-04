@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- Scratch merge-button check ctrl-b. (#3563)
+
 ## [0.32.0+umbrella.0.17.0] - 2026-11-03
 
 ### Fixed
