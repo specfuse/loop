@@ -46,6 +46,7 @@ DIAGNOSE_VALUES = frozenset({"manual", "auto"})
 AUTOFIX_VALUES = frozenset({"off", "on"})
 CHECK_TYPES = frozenset(
     {
+        "backlog-stalled",
         "dlq",
         "error-logs",
         "http-5xx",
@@ -262,6 +263,13 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
                 )
         elif check_type == "http-status-regression":
             findings.extend(_check_http_status_regression(check, component_label, index))
+        elif check_type == "backlog-stalled":
+            if check.get("targets") is None:
+                findings.append(
+                    f"component '{component_label}': checks[{index}]: "
+                    f"'backlog-stalled' check requires 'targets' — each target "
+                    f"needs 'name' and 'stall_after'"
+                )
         elif check_type == "invariant":
             for field in ("query", "fingerprint_by"):
                 if not check.get(field):
@@ -282,6 +290,7 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
 # they are role-name keyed and therefore genuinely component-scoped; see
 # `_TARGETLESS_CHECK_TYPES` below.
 _TARGET_REQUIRED_FIELDS = {
+    "backlog-stalled": ("name", "stall_after"),
     "dlq": ("subscription", "function"),
     "heartbeat": ("name",),
     "queue-stalled": ("subscription", "function"),
@@ -360,7 +369,8 @@ def _check_targets(
     check type is required to interpret. `cron`'s field *values* stay
     opaque; only the field *count* is checked. `timezone` and
     `invariant.query` are untouched by this and remain fully opaque.
-    `targets` itself is required for `dlq` and `queue-stalled` (enforced in
+    `targets` itself is required for `dlq`, `queue-stalled` and
+    `backlog-stalled` (enforced in
     `_check_checks`, since a missing key and an empty/malformed one are
     different findings). `error-logs`, `http-5xx`, and `invariant` must not
     carry `targets` at all; every other check type treats `targets` as
@@ -405,6 +415,28 @@ def _check_targets(
                     f"'stall_after' value {target['stall_after']!r} is not a "
                     f"valid duration — expected {DURATION_GRAMMAR}"
                 )
+        if check_type == "backlog-stalled":
+            findings.extend(_check_backlog_durations(target, where, t_index))
+    return findings
+
+
+def _check_backlog_durations(target: dict, where: str, t_index: int) -> list[str]:
+    """`stall_after` and the optional `silent_after` of one `backlog-stalled`
+    target must parse with the shared duration grammar (#3576). A missing
+    `stall_after` is already reported by the required-fields pass."""
+    findings: list[str] = []
+    for field in ("stall_after", "silent_after"):
+        value = target.get(field)
+        if value is None or (field == "stall_after" and not value):
+            continue
+        try:
+            parse_duration_seconds(str(value), field)
+        except ValueError:
+            findings.append(
+                f"{where}: targets[{t_index}]: 'backlog-stalled' target "
+                f"'{field}' value {value!r} is not a valid duration — "
+                f"expected {DURATION_GRAMMAR}"
+            )
     return findings
 
 

@@ -123,6 +123,20 @@ components:
         query: "select count(*) from orders where fulfilled_at is null and created_at < now() - interval '1 day'"
         fingerprint_by: order_id
 
+      # backlog-stalled: catches a work queue this component keeps in its OWN
+      # data store (a transactional outbox, a job table) that has stopped
+      # draining. The rows never reach the broker, so `dlq`/`queue-stalled`
+      # see nothing. The component reports each backlog itself as a
+      # `BacklogSnapshot` event (see .specfuse/rules/design-for-diagnosis.md);
+      # `name` is that event's `backlogName`. `stall_after`: the oldest pending
+      # item older than this is a finding. `silent_after` (optional): no
+      # snapshot at all for this long is a finding — the reporter died.
+      - type: backlog-stalled
+        targets:
+          - name: acme-event-outbox
+            stall_after: 15m
+            silent_after: 30m
+
       - type: heartbeat
 
   # acme-functions-host: the motivating shape this feature exists for. One

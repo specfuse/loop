@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 This rule governs the *target application's* code — not this loop's own
 execution. It states what a deployed component must do so the check types a
-`monitoring.yml` admits (`dlq`, `error-logs`, `http-5xx`,
+`monitoring.yml` admits (`backlog-stalled`, `dlq`, `error-logs`, `http-5xx`,
 `http-status-regression`, `heartbeat`, `invariant`, `queue-stalled`) produce a diagnosable finding instead of a bare alert. A check that
 fires without one of these properties tells an operator only that something is
 wrong, not what or where.
@@ -130,6 +130,37 @@ different event name or property, or emits without its role name is
 indistinguishable from one whose schedule has stopped — the check reports every
 target as silent from its first run, and the real silence, when it comes, is
 lost in that noise.
+
+## Data-store work queues report a backlog snapshot
+
+A component that keeps a work queue in its own data store — a transactional
+outbox table, a job table, a pending-work table drained by a poller loop —
+periodically reports the state of each such backlog, in exactly this shape: one
+custom event named `BacklogSnapshot` per backlog it owns, emitted under the
+component's role name, carrying:
+
+- `backlogName` — a stable identifier for the backlog (for example
+  `event-outbox`), the same string as the `name` of the matching
+  `backlog-stalled` target in `monitoring.yml`;
+- `oldestPendingAgeSeconds` — the age in seconds of the oldest unprocessed
+  item, `0` when the backlog is empty;
+- `pendingCount` — optional, the number of unprocessed items.
+
+Emit on a fixed interval from the component's own process, independently of
+whether the drainer succeeds, so the snapshot keeps arriving while the drainer
+is wedged.
+
+A broker-level check cannot see this queue: rows still in an outbox never reach
+the broker, so the broker looks quiet and healthy, and a schedule that fires on
+time proves nothing about whether the rows it should drain are moving. A
+`backlog-stalled` check reads the latest snapshot per backlog and reports when
+its oldest pending item is older than the target's `stall_after`, and, when the
+target sets `silent_after`, when no snapshot for that backlog arrived within it
+— the reporter itself has stopped. `pendingCount` only enriches the finding; it
+is never compared against a threshold, because this is a "work is waiting and
+not moving" signal, not volume alerting. The component reports its own backlog
+so the monitor never needs credentials to, or knowledge of the schema of, the
+data store itself.
 
 ## DLQ entries carry failure context, not just the payload
 

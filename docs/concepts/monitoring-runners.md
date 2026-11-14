@@ -86,9 +86,11 @@ operator) it starts 24 hours back instead, and the run summary says so.
 The window applies to the checks that read event history: `error-logs` and
 `http-5xx` filter on `ingestion_time()`, so a row stamped just before the
 previous run but ingested after it is read by the next run rather than lost
-between the two. Three check types are deliberately not bounded by it:
+between the two. These check types are deliberately not bounded by it:
 
 - `heartbeat` needs the most recent heartbeat however old it is;
+- `backlog-stalled` reads each backlog's latest snapshot within a fixed
+  7-day lookback, since a stall is a state, not an event;
 - `http-status-regression` compares the windows around each deployment and
   carries its own fixed lookback;
 - `invariant` runs the operator's query as written. A query that reads event
@@ -184,6 +186,7 @@ the issue was last updated (UTC), what was seen in this run (count, first, last,
 | `dlq` | Message (id, sequence number, subject, enqueued time, delivery count), Dead-letter reason, or the Exception message and top stack frames when the reason is blank, Body shape (the top-level keys, never the values), Peek it |
 | `heartbeat` | Schedule (cron, dialect, timezone, expected firing), Last run (the function's last execution and result), Host last seen, a Host silent line when the component sent no request telemetry across the expected firing, and Earliest heartbeat (the component's first heartbeat, which the grace rule measures from) |
 | `queue-stalled` | Queue (oldest active message age, depth, `stall_after`), Where |
+| `backlog-stalled` | Thresholds (`stall_after`, `silent_after`), Latest snapshot (time, oldest pending age, pending count), Investigate |
 
 A section with nothing to say is left out rather than printed empty. A
 `queue-stalled` finding cannot show when the subscription last completed a

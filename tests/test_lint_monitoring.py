@@ -841,5 +841,61 @@ class TestHttpStatusRegression(unittest.TestCase):
                 self.assertEqual(len(self._findings(body)), 1, name)
 
 
+class TestBacklogStalled(unittest.TestCase):
+    """`backlog-stalled` field rules (#3576): `targets` required, each
+    target needs `name` and `stall_after`; `silent_after` optional; both
+    durations use the shared `<integer><unit>` grammar."""
+
+    def _findings(self, body: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "monitoring.yml"
+            p.write_text(
+                VALID_CONFIG.replace(
+                    "      - type: heartbeat\n",
+                    "      - type: heartbeat\n      - type: backlog-stalled\n" + body,
+                    1,
+                )
+            )
+            return validate_monitoring(p)
+
+    def test_wellformed_targets_are_clean(self):
+        body = (
+            "        targets:\n"
+            "          - name: acme-event-outbox\n"
+            "            stall_after: 15m\n"
+            "            silent_after: 30m\n"
+            "          - name: acme-notification-jobs\n"
+            "            stall_after: 1h\n"
+        )
+        self.assertEqual(self._findings(body), [])
+
+    def test_field_rules(self):
+        cases = {
+            "missing targets": ("", "targets"),
+            "empty targets": ("        targets: []\n", "must not be empty"),
+            "missing name": (
+                "        targets:\n          - stall_after: 15m\n", "'name'"),
+            "missing stall_after": (
+                "        targets:\n          - name: acme-event-outbox\n",
+                "'stall_after'"),
+            "malformed stall_after": (
+                "        targets:\n          - name: acme-event-outbox\n"
+                "            stall_after: 15min\n",
+                "<integer><unit>"),
+            "malformed silent_after": (
+                "        targets:\n          - name: acme-event-outbox\n"
+                "            stall_after: 15m\n"
+                "            silent_after: half an hour\n",
+                "silent_after"),
+        }
+        for name, (body, needle) in cases.items():
+            with self.subTest(name):
+                findings = self._findings(body)
+                self.assertEqual(len(findings), 1, findings)
+                self.assertIn(needle, findings[0])
+                if name != "empty targets":
+                    self.assertIn("backlog-stalled", findings[0])
+
+
 if __name__ == "__main__":
     unittest.main()

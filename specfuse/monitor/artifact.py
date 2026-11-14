@@ -24,6 +24,7 @@ from typing import Mapping, Optional
 # requirements without importing from lint_monitoring.py — that module is
 # gate 2's, and this WU only reads its shape (see the WU's "do not touch").
 _TARGET_COORDINATE_FIELDS: Mapping[str, tuple[str, ...]] = {
+    "backlog-stalled": ("name",),
     "dlq": ("subscription", "function"),
     "heartbeat": ("name",),
     "queue-stalled": ("subscription", "function"),
