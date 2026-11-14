@@ -36,7 +36,7 @@ from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.artifact import FailureArtifact
 from specfuse.monitor.durations import parse_duration_seconds
-from specfuse.monitor.redaction import redact_artifact
+from specfuse.monitor.redaction import redact_artifact, redact_text
 
 # Credential construction is shared with the other Azure provider and looked up
 # reflectively by the core as `build_credential` (#302).
@@ -436,6 +436,36 @@ _SAMPLE_OPERATIONS = 3
 _REGRESSION_LOOKBACK = "7d"
 
 
+def _deployment_windows(
+    versions_scope: str, rows_scope: str, columns: str, window: str
+) -> str:
+    """The stage every deploy-correlated query shares (``http-status-regression``,
+    ``dependency-regression``): each version's first-seen time in
+    ``versions_scope`` is a deployment; deployments whose after-window has fully
+    elapsed, and whose before-window lies inside the lookback, are kept; and
+    each row of ``rows_scope`` (projected to ``columns``) falling in either
+    window is joined to its deployment. Callers summarize the result."""
+    return (
+        f"{versions_scope} "
+        "| summarize first_seen = min(TimeGenerated) by AppVersion "
+        f"| where first_seen + {window} <= now() "
+        f"and first_seen - {window} >= ago({_REGRESSION_LOOKBACK}) "
+        "| project AppVersion, first_seen, k = 1 "
+        f"| join kind=inner ({rows_scope} "
+        f"| project {columns}, k = 1) on k "
+        f"| where TimeGenerated >= first_seen - {window} "
+        f"and TimeGenerated < first_seen + {window} "
+    )
+
+
+def _version_scope(table: str, component: str) -> str:
+    return (
+        f"{table} | where AppRoleName == '{component}' "
+        f"and TimeGenerated > ago({_REGRESSION_LOOKBACK}) "
+        "and isnotempty(AppVersion)"
+    )
+
+
 def _http_status_regression_query(
     component: str, window_seconds: int, codes: Sequence[object]
 ) -> str:
@@ -450,22 +480,10 @@ def _http_status_regression_query(
     """
     window = f"{int(window_seconds)}s"
     code_list = ", ".join(f"'{c}'" for c in codes)
-    scope = (
-        f"AppRequests | where AppRoleName == '{component}' "
-        f"and TimeGenerated > ago({_REGRESSION_LOOKBACK}) "
-        "and isnotempty(AppVersion)"
-    )
+    scope = _version_scope("AppRequests", component)
     return (
-        f"{scope} "
-        "| summarize first_seen = min(TimeGenerated) by AppVersion "
-        f"| where first_seen + {window} <= now() "
-        f"and first_seen - {window} >= ago({_REGRESSION_LOOKBACK}) "
-        "| project AppVersion, first_seen, k = 1 "
-        f"| join kind=inner ({scope} "
-        "| project TimeGenerated, ResultCode, Name, OperationId, k = 1) on k "
-        f"| where TimeGenerated >= first_seen - {window} "
-        f"and TimeGenerated < first_seen + {window} "
-        "| summarize after = countif(TimeGenerated >= first_seen), "
+        _deployment_windows(scope, scope, "TimeGenerated, ResultCode, Name, OperationId", window)
+        + "| summarize after = countif(TimeGenerated >= first_seen), "
         "before = countif(TimeGenerated < first_seen), "
         "sampleOp = take_anyif(OperationId, TimeGenerated >= first_seen) "
         "by AppVersion, first_seen, ResultCode, Name "
@@ -576,16 +594,10 @@ class HttpStatusRegressionAdapter:
             version = str(row.get("version") or "unknown-version")
             if code not in self._codes:
                 continue
-            first_seen = _as_utc(row.get("first_seen"))
-            counts = [
-                _count(row.get(key))
-                for key in ("after", "before", "after_total", "before_total")
-            ]
-            if first_seen is None or None in counts:
+            evaluated = _evaluable_deployment(row, window_seconds, reference)
+            if evaluated is None:
                 continue
-            if first_seen + timedelta(seconds=window_seconds) > reference:
-                continue
-            after, before, after_total, before_total = counts  # type: ignore[misc]
+            first_seen, (after, before, after_total, before_total) = evaluated
             if (code, version) in seen or not _regressed(
                 after, before, after_total, before_total
             ):
@@ -657,14 +669,235 @@ class HttpStatusRegressionAdapter:
         return redact_artifact(artifact)
 
 
-def _regressed(after: int, before: int, after_total: int, before_total: int) -> bool:
+def _evaluable_deployment(
+    row: Mapping[str, object], window_seconds: int, reference: datetime
+) -> Optional[tuple]:
+    """``(first_seen, (after, before, after_total, before_total))`` for a
+    deploy-correlated row whose after-window has fully elapsed at
+    ``reference``; ``None`` for a malformed row or a deployment still inside
+    its window. Shared by every deploy-correlated adapter."""
+    first_seen = _as_utc(row.get("first_seen"))
+    counts = [_count(row.get(key)) for key in ("after", "before", "after_total", "before_total")]
+    if first_seen is None or None in counts:
+        return None
+    if first_seen + timedelta(seconds=window_seconds) > reference:
+        return None
+    return first_seen, tuple(counts)
+
+
+def _regressed(
+    after: int,
+    before: int,
+    after_total: int,
+    before_total: int,
+    min_count: int = REGRESSION_MIN_COUNT,
+) -> bool:
     """``after/after_total >= FACTOR * before/before_total``, in integers; a
-    before-window with no requests, or none of the code, has a share of 0."""
-    if after_total <= 0 or after < REGRESSION_MIN_COUNT:
+    before-window with no traffic, or none of the counted outcome, has a share
+    of 0."""
+    if after_total <= 0 or after < min_count:
         return False
     if before_total <= 0 or before <= 0:
         return True
     return after * before_total >= REGRESSION_FACTOR * before * after_total
+
+
+# `dependency-regression` (#3577). Failures only, by recorded decision: a
+# failed call is discrete, while latency is a distribution comparison closer
+# to metrics. A latency regression surfaces once it becomes a timeout, which
+# is a failed call; an opt-in `latency_ratio` remains a possible later decision.
+DEFAULT_MIN_FAILURES = 5
+_TOP_RESULT_CODES = 5
+_NO_RESULT_CODE = "none"
+
+
+def _dependency_regression_query(
+    component: str,
+    window_seconds: int,
+    dependency_types: Optional[Sequence[object]],
+    min_failures: int,
+) -> str:
+    """One query over ``AppDependencies``, built only from operator
+    configuration (the component, ``dependency_types``, ``min_failures``,
+    ``window_after_deploy`` and the fixed lookback). Deployments are each
+    version's first dependency call under the component's role name; per
+    (version, dependency type, target) the after- and before-window failed
+    and total call counts come back, with the pair's failing result codes
+    ranked by after-window failures and a few failed-call operation ids.
+    The ratio arithmetic is the adapter's."""
+    window = f"{int(window_seconds)}s"
+    versions = _version_scope("AppDependencies", component)
+    rows = versions
+    if dependency_types:
+        type_list = ", ".join(f"'{_kql_literal(str(t))}'" for t in dependency_types)
+        rows = f"{versions} and DependencyType in~ ({type_list})"
+    return (
+        _deployment_windows(
+            versions, rows,
+            "TimeGenerated, DependencyType, Target, ResultCode, Success, OperationId",
+            window,
+        )
+        + "| summarize failedAfter = countif(TimeGenerated >= first_seen and Success == false), "
+        "failedBefore = countif(TimeGenerated < first_seen and Success == false), "
+        "callsAfter = countif(TimeGenerated >= first_seen), "
+        "callsBefore = countif(TimeGenerated < first_seen), "
+        "sampleOp = take_anyif(OperationId, TimeGenerated >= first_seen and Success == false) "
+        "by AppVersion, first_seen, DependencyType, Target, ResultCode "
+        "| sort by AppVersion asc, DependencyType asc, Target asc, failedAfter desc "
+        "| extend rn = row_number(1, prev(AppVersion) != AppVersion "
+        "or prev(DependencyType) != DependencyType or prev(Target) != Target) "
+        "| summarize after = sum(failedAfter), before = sum(failedBefore), "
+        "after_total = sum(callsAfter), before_total = sum(callsBefore), "
+        "codes = make_list_if(pack('code', ResultCode, 'after', failedAfter, "
+        f"'before', failedBefore), failedAfter > 0 and rn <= {_TOP_RESULT_CODES}), "
+        f"samples = make_list_if(sampleOp, rn <= {_SAMPLE_OPERATIONS} "
+        "and isnotempty(sampleOp)) "
+        "by AppVersion, first_seen, DependencyType, Target "
+        f"| where after >= {int(min_failures)} "
+        "| project version = AppVersion, first_seen, dependency_type = DependencyType, "
+        "target = Target, after, before, after_total, before_total, codes, samples"
+    )
+
+
+def _rate(count: int, total: int) -> str:
+    return f"{100 * count / total:.2f}%" if total > 0 else "n/a (no calls)"
+
+
+class DependencyRegressionAdapter:
+    """``TelemetryAdapter`` for the ``dependency-regression`` check type (#3577).
+
+    One finding per (deployment version, dependency type, target) whose
+    after-window has fully elapsed at ``reference_time``, with at least
+    ``min_failures`` failed calls in the after-window and a failure rate
+    (failed / all calls to that pair) at least ``REGRESSION_FACTOR`` times the
+    equal-length before-window's. A pair with no calls or no failures before
+    the deployment has a before-rate of 0 and fires on the floor alone. The
+    signature is ``<version>:<type>:<target>:<top result code>`` so the
+    finding is filed once per deployment.
+    """
+
+    def __init__(
+        self,
+        *,
+        component: str,
+        environment: Mapping[str, object],
+        transport: AppInsightsTransport,
+        deploy_signal: object = None,
+        window_after_deploy: object = None,
+        dependency_types: Optional[Sequence[object]] = None,
+        min_failures: Optional[int] = None,
+        reference_time: Optional[datetime] = None,
+    ) -> None:
+        self._component = component
+        self._telemetry = resolve_telemetry(component, environment)
+        self._transport = transport
+        self._deploy_signal = deploy_signal
+        self._window_after_deploy = window_after_deploy
+        self._types = [str(t) for t in dependency_types] if dependency_types else None
+        self._min_failures = int(min_failures) if min_failures else DEFAULT_MIN_FAILURES
+        self._reference_time = reference_time
+
+    def fetch_failures(self) -> Iterator[FailureArtifact]:
+        window_seconds = parse_duration_seconds(
+            self._window_after_deploy, "window_after_deploy"  # type: ignore[arg-type]
+        )
+        reference = _as_utc(self._reference_time) or datetime.now(timezone.utc)
+        query = _dependency_regression_query(
+            self._component, window_seconds, self._types, self._min_failures
+        )
+        wanted = {t.lower() for t in self._types} if self._types else None
+        seen: set = set()
+        for row in self._transport.run_query(query):
+            dep_type = str(row.get("dependency_type") or "")
+            target = str(row.get("target") or "")
+            version = str(row.get("version") or "unknown-version")
+            if wanted is not None and dep_type.lower() not in wanted:
+                continue
+            evaluated = _evaluable_deployment(row, window_seconds, reference)
+            if evaluated is None:
+                continue
+            first_seen, (after, before, after_total, before_total) = evaluated
+            key = (version, dep_type, target)
+            if key in seen or not _regressed(
+                after, before, after_total, before_total, self._min_failures
+            ):
+                continue
+            seen.add(key)
+            yield self._build_artifact(
+                version, dep_type, target, first_seen, window_seconds,
+                after, before, after_total, before_total,
+                _ranked_codes(_dynamic_list(row.get("codes"))),
+                _dynamic_list(row.get("samples")),
+            )
+
+    def _build_artifact(
+        self,
+        version: str,
+        dep_type: str,
+        target: str,
+        first_seen: datetime,
+        window_seconds: int,
+        after: int,
+        before: int,
+        after_total: int,
+        before_total: int,
+        codes: list,
+        samples: list,
+    ) -> FailureArtifact:
+        window = self._window_after_deploy
+        top_code = codes[0][0] if codes else _NO_RESULT_CODE
+        lines = [
+            f"{dep_type} calls to {target} started failing after deployment "
+            f"{version} (first seen {_iso(first_seen)}).",
+            f"Failure rate: {_rate(before, before_total)} in the {window} before "
+            f"({before} of {before_total}), {_rate(after, after_total)} in the "
+            f"{window} after ({after} of {after_total}). Fires at "
+            f"{REGRESSION_FACTOR}x the before-rate with at least "
+            f"{self._min_failures} failed calls after.",
+        ]
+        if codes:
+            lines += ["", "Failing result codes:"]
+            lines += [f"  {code}: {a} after, {b} before" for code, a, b in codes]
+        sample_ids = [str(s) for s in samples if s][:_SAMPLE_OPERATIONS]
+        if sample_ids:
+            lines += ["", f"Sample failed operation ids after the deployment: {', '.join(sample_ids)}"]
+        span = timedelta(seconds=window_seconds)
+        lines += [
+            "",
+            "Investigate in Log Analytics:",
+            "AppDependencies",
+            f"| where AppRoleName == '{_kql_literal(self._component)}' "
+            f"and DependencyType == '{_kql_literal(dep_type)}' "
+            f"and Target == '{_kql_literal(target)}'",
+            f"| where TimeGenerated between (datetime({_iso(first_seen - span)}) "
+            f".. datetime({_iso(first_seen + span)}))",
+            "| summarize calls = count(), failed = countif(Success == false) "
+            "by AppVersion, ResultCode, bin(TimeGenerated, 5m)",
+        ]
+        artifact = FailureArtifact(
+            component=self._component,
+            check_type="dependency-regression",
+            failure_class=dep_type,
+            # Redacted on its own: redact_artifact leaves the signature alone,
+            # and a target can carry a connection-string-shaped value.
+            failure_signature=redact_text(f"{version}:{dep_type}:{target}:{top_code}"),
+            observed_text="\n".join(lines),
+            target_coordinates=None,
+        )
+        return redact_artifact(artifact)
+
+
+def _ranked_codes(entries: list) -> list:
+    """``[(code, after, before)]`` ordered by after-window failures, ties on
+    the code's text, so the top code (part of the signature) is stable."""
+    ranked = []
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            continue
+        code = str(entry.get("code") or "").strip() or _NO_RESULT_CODE
+        ranked.append((code, _count(entry.get("after")) or 0, _count(entry.get("before")) or 0))
+    ranked.sort(key=lambda c: (-c[1], c[0]))
+    return ranked[:_TOP_RESULT_CODES]
 
 
 class InvariantAdapter:

@@ -265,6 +265,8 @@ def _build_adapter(
         deploy_signal=check.get("deploy_signal"),
         window_after_deploy=check.get("window_after_deploy"),
         codes=check.get("codes"),
+        dependency_types=check.get("dependency_types"),
+        min_failures=check.get("min_failures"),
         # The harvest window (#3480): adapters that read event history
         # accept it; those that need older history by design do not.
         since=since,

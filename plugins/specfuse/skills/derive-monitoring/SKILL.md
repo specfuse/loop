@@ -195,6 +195,18 @@ nothing emits would never fire. The reference behaviour is
 `suggest_checks` / `audit_diagnosability` in
 `tests/test_derive_monitoring_discovery.py`.
 
+**Dependency regression.** A component — HTTP-serving or not — that shows both
+a per-deployment version stamp and a recorded data-store dependency (a client
+of the store it owns, matched in its own scope by the project's
+`data_store_markers` pattern table; the record's `data_store` field) also gets
+`dependency-regression` with `deploy_signal: {kind: app-version}` and a
+`window_after_deploy`. Leave `dependency_types` at its default (every type the
+component records) unless the operator narrows it: the store's type name is
+whatever the telemetry records, not something discovery can know. A component
+with a data store and no version stamp gets no check and a `version-stamping`
+finding naming `dependency-regression`. The check is failures only, by
+decision (#3577): never propose a latency threshold for it.
+
 ### Step 3 — Ask only what the repo cannot answer
 
 The legitimate question set is small and is batched into **one round**, presented

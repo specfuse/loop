@@ -93,6 +93,7 @@ between the two. These check types are deliberately not bounded by it:
   7-day lookback, since a stall is a state, not an event;
 - `http-status-regression` compares the windows around each deployment and
   carries its own fixed lookback;
+- `dependency-regression` does the same for the component's dependency calls;
 - `invariant` runs the operator's query as written. A query that reads event
   history should bound itself (for example `| where TimeGenerated > ago(1h)`);
   otherwise every matching row in retention is a finding, deduplicated only by

@@ -133,6 +133,12 @@ _BUILT_IN_QUERIES = {
         component, 3600, ["401", "403"]
     ),
     "backlog-stalled": aai._backlog_stalled_query,
+    "dependency-regression": lambda component: aai._dependency_regression_query(
+        component, 3600, ["SQL", "Azure blob"], 5
+    ),
+    "dependency-regression (all types)": lambda component: (
+        aai._dependency_regression_query(component, 3600, None, 5)
+    ),
 }
 
 

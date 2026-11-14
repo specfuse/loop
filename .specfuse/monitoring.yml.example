@@ -90,6 +90,19 @@ components:
         # codes defaults to [403, 405, 415]; this one also opts in to 401.
         codes: [401, 403, 405, 415]
 
+      # dependency-regression: alerts when a deployment makes calls to one of
+      # the component's dependencies (its database first) start failing — a
+      # migration that did not run, a renamed column, a broken connection
+      # string. Same deploy_signal block as http-status-regression. Failures
+      # only: a slow query is seen once it times out. A (type, target) pair
+      # fires at min_failures failed calls and 3x its pre-deploy failure rate.
+      - type: dependency-regression
+        deploy_signal:
+          kind: app-version
+        window_after_deploy: 1h
+        dependency_types: [SQL]   # default: every type the component records
+        min_failures: 5           # default 5
+
       # heartbeat: alerts when the component stops reporting in at all —
       # the check that catches "it didn't error, it just went silent."
       - type: heartbeat

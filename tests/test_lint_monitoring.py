@@ -897,5 +897,73 @@ class TestBacklogStalled(unittest.TestCase):
                     self.assertIn("backlog-stalled", findings[0])
 
 
+class TestDependencyRegression(unittest.TestCase):
+    """`dependency-regression` field rules (#3577). `deploy_signal` and
+    `window_after_deploy` are the same block `http-status-regression` takes,
+    validated by the same code."""
+
+    def _findings(self, check_type: str, body: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "monitoring.yml"
+            p.write_text(
+                VALID_CONFIG.replace(
+                    "      - type: heartbeat\n",
+                    f"      - type: heartbeat\n      - type: {check_type}\n" + body,
+                    1,
+                )
+            )
+            return validate_monitoring(p)
+
+    _GOOD = "        deploy_signal:\n          kind: app-version\n"
+    _WINDOW = "        window_after_deploy: 1h\n"
+
+    def test_minimal_and_full_checks_are_clean(self):
+        self.assertEqual(self._findings("dependency-regression", self._GOOD + self._WINDOW), [])
+        full = (
+            self._GOOD + self._WINDOW
+            + "        dependency_types: [SQL, \"Azure blob\"]\n"
+            + "        min_failures: 1\n"
+        )
+        self.assertEqual(self._findings("dependency-regression", full), [])
+
+    def test_field_rules(self):
+        good, window = self._GOOD, self._WINDOW
+        cases = {
+            "missing deploy_signal": window,
+            "wrong kind": "        deploy_signal:\n          kind: ci-annotation\n" + window,
+            "missing window": good,
+            "malformed window": good + "        window_after_deploy: 1 hour\n",
+            "types not a list": good + window + "        dependency_types: SQL\n",
+            "types empty": good + window + "        dependency_types: []\n",
+            "types duplicate": good + window + "        dependency_types: [SQL, SQL]\n",
+            "types non-string": good + window + "        dependency_types: [5]\n",
+            "min_failures zero": good + window + "        min_failures: 0\n",
+            "min_failures text": good + window + "        min_failures: five\n",
+            "min_failures bool": good + window + "        min_failures: true\n",
+            "targets": good
+            + window
+            + "        targets:\n          - subscription: s\n            function: f\n",
+        }
+        for name, body in cases.items():
+            with self.subTest(name):
+                self.assertEqual(len(self._findings("dependency-regression", body)), 1, name)
+
+    def test_deploy_block_findings_are_shared_with_http_status_regression(self):
+        # One implementation: the same defect reads the same, bar the type.
+        for body in (
+            self._WINDOW,
+            "        deploy_signal:\n          kind: ci-annotation\n" + self._WINDOW,
+            self._GOOD,
+            self._GOOD + "        window_after_deploy: 1 hour\n",
+        ):
+            with self.subTest(body=body):
+                http = self._findings("http-status-regression", body)
+                dep = self._findings("dependency-regression", body)
+                self.assertEqual(
+                    [f.replace("http-status-regression", "dependency-regression") for f in http],
+                    dep,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

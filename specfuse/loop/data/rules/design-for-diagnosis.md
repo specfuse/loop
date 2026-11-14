@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 This rule governs the *target application's* code — not this loop's own
 execution. It states what a deployed component must do so the check types a
-`monitoring.yml` admits (`backlog-stalled`, `dlq`, `error-logs`, `http-5xx`,
+`monitoring.yml` admits (`backlog-stalled`, `dependency-regression`, `dlq`, `error-logs`, `http-5xx`,
 `http-status-regression`, `heartbeat`, `invariant`, `queue-stalled`) produce a diagnosable finding instead of a bare alert. A check that
 fires without one of these properties tells an operator only that something is
 wrong, not what or where.
@@ -190,3 +190,15 @@ that stamps no version has no deployment signal at all; one that stamps the same
 value every release shows no new version to detect, so the check never opens its
 post-deployment window and a regression ships unseen. Either way the check
 cannot be evaluated, and discovery reports the gap rather than proposing it.
+
+A `dependency-regression` check reads the same version stamp from the
+component's outbound dependency calls — its database first — so the property
+applies to any component that calls a data store, HTTP-serving or not. Each
+call must be recorded with its dependency type, its target and a success flag
+(and the result code where the client has one); a component that catches a
+failed query and degrades still records that call as failed, which is exactly
+what the check looks for. The check is failures only, by decision (#3577): a
+failed call is discrete, while latency is a distribution comparison closer to
+metrics. A query that slows down after a deployment surfaces once it times out,
+because a timeout is a failed call. An opt-in latency ratio stays a possible
+later decision, to be made explicitly rather than by precedent.

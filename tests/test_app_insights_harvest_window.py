@@ -6,9 +6,10 @@ or `now - lookback` without one — not the workspace's whole retention.
 
 The window is bounded on `ingestion_time()`, not `TimeGenerated`: a row
 stamped just before the previous run but ingested after it is still picked
-up by the next run instead of being skipped forever. `heartbeat` and
-`http-status-regression` are deliberately not bounded by it: one needs the
-last heartbeat however old, the other compares windows around a deployment.
+up by the next run instead of being skipped forever. `heartbeat`,
+`http-status-regression` and `dependency-regression` are deliberately not
+bounded by it: one needs the last heartbeat however old, the others compare
+windows around a deployment.
 """
 
 from __future__ import annotations
@@ -110,8 +111,10 @@ class TestTelemetryQueriesAreBoundedToTheHarvestWindow(unittest.TestCase):
             ]},
             {"type": "http-status-regression", "deploy_signal": {"kind": "app-version"},
              "window_after_deploy": "1h"},
+            {"type": "dependency-regression", "deploy_signal": {"kind": "app-version"},
+             "window_after_deploy": "1h"},
         ])
-        for check_type in ("heartbeat", "http-status-regression"):
+        for check_type in ("heartbeat", "http-status-regression", "dependency-regression"):
             with self.subTest(check_type=check_type):
                 self.assertNotIn("ingestion_time()", queries[check_type])
 
