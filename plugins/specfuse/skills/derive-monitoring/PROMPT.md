@@ -79,7 +79,21 @@ propagation, structured logging, per-component role names, heartbeat
 emission, DLQ failure-context capture. A component given `heartbeat`
 targets whose own code emits no `ScheduleHeartbeat` event (schedule name
 in a `scheduleName` property, under its role name) gets a
-`heartbeat-emission` finding — those targets would all report silent. An HTTP-serving component showing no per-deployment version stamp (`version-stamping`) gets one finding and no `http-status-regression` check; with the stamp it gets that check (`deploy_signal: {kind: app-version}`, a `window_after_deploy`). **Every finding is `WARN`, never `ERROR`.** A
+`heartbeat-emission` finding — those targets would all report silent. An HTTP-serving component showing no per-deployment version stamp (`version-stamping`) gets one finding and no `http-status-regression` check; with the stamp it gets that check (`deploy_signal: {kind: app-version}`, a `window_after_deploy`).
+
+A component whose scope shows a data store (connection setting, data-access
+library, migrations directory) gets the `data-store-signals` audit. The monitor
+never connects to a data store: never propose a direct database check, a
+data-store provider, or an `invariant` whose `query` reads the store. Check
+instead for the owned signals the component should emit as telemetry — table
+backlogs (planned `backlog-stalled`, #3576), business-state invariants over
+persisted data, migration state (expected versus applied migration, read by the
+existing `invariant` check). Each one not emitted is a `data-store-signals`
+finding: a design-for-diagnosis gap for the component to close. Platform health
+(CPU/throughput units, storage, connections, deadlocks, replication lag,
+failover) is out of scope — list it under the report's out-of-scope section so
+the operator routes it to infrastructure alerting. The test: would the fix be a
+pull request on the component? **Every finding is `WARN`, never `ERROR`.** A
 populated codebase predating the rule violates it everywhere by
 construction, so an `ERROR` predicate would be unsatisfiable on real input.
 The audit informs the operator; it never blocks the draft.
@@ -107,6 +121,10 @@ Legitimate question categories — **and only these**, batched into one round:
    inferred or invented.
 5. **Per-component dial loosening** beyond the conservative defaults
    (`runner: local`, `diagnose: manual`, `autofix: "off"`).
+6. **For a component with a data store, which owned signals it emits**
+   (backlogs, invariants, migration state) when the evidence could not
+   tell. "None" is a `data-store-signals` finding, never a reason to draft
+   a check that reads the store.
 
 **Forbidden:** asking anything a file already answered — e.g. "what
 components does this project deploy?" when a deployment manifest names
@@ -166,6 +184,9 @@ Print, in order:
 ## Diagnosability audit (WARN only)
 - <component>: <property> — <finding, or "none">
 
+## Out of scope (route to infrastructure alerting)
+- <component>: <platform-health signal> — not a component fix — or "none raised"
+
 ## Credential reuse (WARN only, heuristic)
 - <ENV_VAR_NAME>: credential-reuse — read by the application at <file:line>;
   suggest <MONITOR_ENV_VAR_NAME>, provisioned read-only per
@@ -192,6 +213,8 @@ Print, in order:
   environment-variable *name* that holds one.
 - Never invent an `invariant` query — omit the check if the operator has
   none ready.
+- Never propose a direct data-store check. Owned data-store signals the
+  component does not emit are `data-store-signals` findings.
 - Use the **`status: blocked`** RESULT-block escape only if something
   fundamental prevents drafting at all (the repo has no deployable
   components, no deployment evidence at all, and the user is

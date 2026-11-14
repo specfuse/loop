@@ -108,6 +108,43 @@ schema (`AppRequests`, `AppExceptions`, `AppEvents`, with `AppRoleName`,
 (`requests`, `exceptions`, `customEvents`, `cloud_RoleName`, `timestamp`,
 `customDimensions`), which a workspace does not resolve.
 
+## Scope: a component's data store is monitored through the component, never directly
+
+The monitor watches component misbehaviour, not metrics or infrastructure.
+A component's data store sits on that boundary; this is where the line falls
+(#3578, also stated in `.specfuse/rules/design-for-diagnosis.md`).
+
+**The monitor never connects to a component's data store.** There is no SQL,
+document-store or cache provider, and none will be added: the harvester holds
+telemetry and broker read access only. A data-store connection would mean
+holding credentials to production (often personal) data, coupling a check to a
+schema that a migration can silently break, and adding one provider per engine.
+
+**Data-store signals the component owns are in scope, and the component emits
+them as telemetry:**
+
+| Signal | Read by |
+|---|---|
+| Backlogs in data-store tables (rows waiting past their expected processing time) | the planned `backlog-stalled` check type (#3576) |
+| Dependency failures that start after a deployment, including data-store calls | the planned `dependency-regression` check type (#3577) |
+| Business-state invariants over persisted data: orphaned rows, records stuck in a state past their deadline, migration drift (the release expects migration N, the store reports M) | the existing `invariant` check |
+
+The component computes each invariant itself and emits the result; `invariant`
+queries that telemetry, never the store. This is `invariant`'s sanctioned
+business-state use, not the rate-shaped use FEAT-2026-0069 ruled out.
+
+**Data-store platform health is out of scope:** CPU and throughput-unit
+consumption, storage, connections, deadlock rate, replication lag, failover. The
+fix for these lives in infrastructure, not the component's repository, so a
+finding has nowhere to route and autofix cannot act on it. They belong to the
+platform's own infrastructure alerting, owned by whoever owns the
+infrastructure.
+
+**The test for any future request:** would the fix be a pull request on the
+component? If yes, it is in scope and the component emits the signal. If the
+fix is a capacity or infrastructure change, it is out of scope. `monitor-lint`
+needs no rule for this: a data-store provider does not exist to be configured.
+
 ## Check targets
 
 `component` and check `targets` are two different axes, and the schema keeps
