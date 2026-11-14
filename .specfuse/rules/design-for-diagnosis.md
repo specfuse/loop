@@ -20,6 +20,43 @@ implementations. How a project achieves a property (which library, which
 platform's native tracing, which log shipper) belongs in that project's
 `.specfuse/rules-local/`, never here.
 
+## A component's data store is monitored through the component, never directly
+
+The monitor watches component misbehaviour, not metrics or infrastructure.
+A component's data store sits on that boundary, so the line is drawn here once
+rather than differently in each project.
+
+**The monitor never connects to a component's data store.** There is no
+data-store provider for any engine; the harvester holds telemetry and broker
+read access only. Three reasons: credentials (a data store holds production
+data, often personal data), schema coupling (a migration silently breaks a check
+that reads tables directly), and provider sprawl (one adapter per engine).
+
+**Data-store signals the component owns are in scope, and the component emits
+them** as telemetry, the same way it emits everything else this rule covers:
+
+- backlogs in data-store tables — rows waiting past their expected processing
+  time — for the planned `backlog-stalled` check type (#3576);
+- dependency failures that start after a deployment, including calls to the
+  data store, for the planned `dependency-regression` check type (#3577);
+- business-state invariants over persisted data — orphaned rows, records stuck
+  in a state past their deadline, or migration drift (the running release
+  expects migration N while the store reports M). The component computes these
+  itself and emits the result; the existing `invariant` check reads that
+  telemetry. This is `invariant`'s sanctioned business-state use; a
+  rate-shaped signal is not an invariant and belongs to its own check type.
+
+**Data-store platform health is out of scope:** CPU and throughput-unit
+consumption, storage, connections, deadlock rate, replication lag, failover.
+The fix for these lives in infrastructure, not in the component's repository,
+so a finding has nowhere to route and an automated fix cannot act on it. They
+belong to the platform's own infrastructure alerting, owned by whoever owns the
+infrastructure.
+
+**The test for any future request:** would the fix be a pull request on the
+component? If yes, the signal is in scope and the component emits it. If the fix
+is a capacity or infrastructure change, it is out of scope.
+
 ## Correlation IDs propagate across component boundaries
 
 A single request or message carries one correlation ID from the moment it enters
