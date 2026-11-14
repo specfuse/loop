@@ -85,12 +85,13 @@ confidence in the checks grows.
 
 ## Check types
 
-Every check has a required `type`, one of seven neutral values. This set is
+Every check has a required `type`, one of the neutral values in the table below. This set is
 provider-agnostic by construction: a check type names a concept
 (a dead-letter queue, a heartbeat), never a vendor.
 
 | Type | Extra required fields | Meaning |
 |---|---|---|
+| `backlog-stalled` | `targets` | Alerts when a work queue the component keeps in its **own data store** (a transactional outbox, a job table drained by a poller) stops draining. Its rows never reach a broker, so `dlq` and `queue-stalled` cannot see it, and `heartbeat` only proves the poller fired. The component reports each backlog itself as a `BacklogSnapshot` event (the emission contract is in `.specfuse/rules/design-for-diagnosis.md`); the monitor never reads the data store. One finding per (component, backlog `name`) while the latest snapshot's oldest pending item is older than `stall_after`, failure class `stalled-backlog`; with `silent_after` set, a separate `silent-backlog` finding when no snapshot for that backlog arrived within it (the reporter died). The backlog name is the signature, so a stall that lasts many runs stays one issue. `pendingCount` appears in the finding but is never compared against a threshold: this is not volume alerting. A component that has emitted no snapshot at all in the last 7 days yields nothing, since a never-deployed reporter and a dead one look the same. |
 | `dlq` | `harvest_mode` (`peek` or `quarantine`), `targets` | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. `targets` is **required**: a dead-lettered message is attributed to a subscription, and a target-less `dlq` check on a multi-subscription host cannot say which one. |
 | `error-logs` | none | Scans structured application logs for error-level entries. |
 | `http-5xx` | none | Alerts when the rolling 5xx rate crosses a threshold. For HTTP-serving components. |
@@ -183,6 +184,7 @@ triggers as `targets[]` is what keeps that property satisfiable.
 |---|---|---|---|
 | `dlq` | **required** | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
 | `queue-stalled` | **required** | `subscription` (required), `function` (required), `stall_after` (optional, `<integer><unit>` with unit `s`/`m`/`h`/`d`, e.g. `15m`) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. `stall_after` (how long is too long since the last message) must match `<integer><unit>` with unit `s`, `m`, `h` or `d` (e.g. `15m`, `90s`, `2h`, `1d`); the linter rejects any other value — the harvester would refuse it on its first poll. A target with no `stall_after` is skipped and recorded at runtime. Only the grammar is checked, not a range. |
+| `backlog-stalled` | **required** | `name` (required), `stall_after` (required), `silent_after` (optional) | `name` is the `backlogName` the component emits. Both durations use the `<integer><unit>` grammar (unit `s`/`m`/`h`/`d`, e.g. `15m`); the linter rejects any other value. Only the grammar is checked, not a range. |
 | `heartbeat` | optional | `name` (required), `cron` (optional), `dialect` (required when `cron` present), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. A single-schedule component may omit the list. |
 | `invariant` | **forbidden** | — | `fingerprint_by` is already this check type's enumeration key; permitting `targets` too would give it two competing enumeration keys. |
 | `error-logs` | **forbidden** | — | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |

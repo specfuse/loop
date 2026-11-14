@@ -132,6 +132,7 @@ _BUILT_IN_QUERIES = {
     "http-status-regression": lambda component: aai._http_status_regression_query(
         component, 3600, ["401", "403"]
     ),
+    "backlog-stalled": aai._backlog_stalled_query,
 }
 
 

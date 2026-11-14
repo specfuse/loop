@@ -39,6 +39,7 @@ itself.
 
 **What it reads.** `.specfuse/monitoring.yml`: each component's checks
 (`error-logs`, `http-5xx`, `http-status-regression`, `dlq`, `queue-stalled`,
+`backlog-stalled`,
 `heartbeat`, `invariant`), each environment's telemetry and broker bindings.
 Event-history checks read only what arrived since the previous run (the
 watermark in `.specfuse/monitor-watermarks/<env>.json`, or the last 24 hours on

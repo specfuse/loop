@@ -98,6 +98,17 @@ populated codebase predating the rule violates it everywhere by
 construction, so an `ERROR` predicate would be unsatisfiable on real input.
 The audit informs the operator; it never blocks the draft.
 
+**Data-store work queues (#3576).** Also look, in each deployable's scope, for
+work queues kept in its own data store — outbox or job tables, poller loops
+draining a pending-work table. `dlq`/`queue-stalled` cannot see them. If the
+component's own code emits a `BacklogSnapshot` custom event per backlog
+(`backlogName`, `oldestPendingAgeSeconds`, optional `pendingCount`, under its
+role name), propose one `backlog-stalled` check with one target per backlog
+(`name` = the `backlogName`, `stall_after: 15m` to start). If it emits none,
+propose no check and report one `backlog-emission` finding naming the backlogs.
+Mirror `suggest_checks`/`audit_diagnosability` in
+`tests/test_derive_monitoring_discovery.py`.
+
 ### Step 3 — Ask the user — only for what evidence cannot resolve
 
 Legitimate question categories — **and only these**, batched into one round:
@@ -125,6 +136,9 @@ Legitimate question categories — **and only these**, batched into one round:
    (backlogs, invariants, migration state) when the evidence could not
    tell. "None" is a `data-store-signals` finding, never a reason to draft
    a check that reads the store.
+7. **Each proposed `backlog-stalled` target's thresholds** — confirm or change
+   `stall_after: 15m`, and whether to add a `silent_after` (a few times the
+   snapshot emission interval).
 
 **Forbidden:** asking anything a file already answered — e.g. "what
 components does this project deploy?" when a deployment manifest names

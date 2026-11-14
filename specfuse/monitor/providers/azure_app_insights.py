@@ -952,6 +952,203 @@ def _duration_text(delta: timedelta) -> str:
     return " ".join(parts) or "0m"
 
 
+# The backlog-snapshot emission contract (#3576): a component that keeps a work
+# queue in its own data store (an outbox or job table) periodically emits one
+# custom event with this name per backlog, under its own role name, carrying
+# the backlog's stable name, the age in seconds of its oldest unprocessed item
+# (0 when empty) and, optionally, its pending count. Documented for target
+# applications in `.specfuse/rules/design-for-diagnosis.md`;
+# tests/test_backlog_snapshot_emission_contract.py holds the two in step.
+BACKLOG_EVENT_NAME = "BacklogSnapshot"
+BACKLOG_NAME_PROPERTY = "backlogName"
+BACKLOG_AGE_PROPERTY = "oldestPendingAgeSeconds"
+BACKLOG_COUNT_PROPERTY = "pendingCount"
+
+# How far back the one query looks for each backlog's latest snapshot. A
+# component with no snapshot at all in this span is pending, not silent.
+_BACKLOG_LOOKBACK = "7d"
+
+
+def _backlog_stalled_query(component: str) -> str:
+    """Built only from *component*, an operator-configured name — never from
+    a telemetry query's returned rows. One row per backlog name: its latest
+    snapshot's time, oldest pending age and pending count. Not bounded by the
+    harvest window: a stall is a state, read from the latest snapshot however
+    old it is (within a fixed lookback)."""
+    return (
+        "AppEvents "
+        f"| where AppRoleName == '{component}' "
+        f"and Name == '{BACKLOG_EVENT_NAME}' "
+        f"and TimeGenerated > ago({_BACKLOG_LOOKBACK}) "
+        f"| extend backlog = tostring(Properties.{BACKLOG_NAME_PROPERTY}) "
+        "| summarize arg_max(TimeGenerated, Properties) by backlog "
+        "| project name = backlog, last_snapshot = TimeGenerated, "
+        "oldest_pending_age_seconds = "
+        f"todouble(Properties.{BACKLOG_AGE_PROPERTY}), "
+        f"pending_count = tolong(Properties.{BACKLOG_COUNT_PROPERTY})"
+    )
+
+
+def _seconds(value: object) -> Optional[float]:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+class BacklogStalledAdapter:
+    """``TelemetryAdapter`` for the ``backlog-stalled`` check type (#3576).
+
+    Per configured target, reads the latest ``BacklogSnapshot`` for that
+    backlog name and yields:
+
+    - a ``stalled-backlog`` finding when its oldest pending item is older than
+      the target's ``stall_after``;
+    - a ``silent-backlog`` finding when the target sets ``silent_after`` and
+      no snapshot for that backlog arrived within it — the reporter itself
+      died, which would otherwise read as healthy.
+
+    Both carry the backlog name as ``failure_signature`` and as the target
+    coordinate, so a stall lasting many harvests stays one issue per
+    (component, backlog), and the two failure classes stay two. The pending
+    count is reported, never compared against a threshold: this is a "work
+    is waiting and not moving" check, not volume alerting.
+
+    A component that has emitted no snapshot at all in the lookback yields
+    nothing: "never deployed" and "reporter dead" are indistinguishable then,
+    the same grace rule ``heartbeat`` applies.
+    """
+
+    def __init__(
+        self,
+        *,
+        component: str,
+        environment: Mapping[str, object],
+        transport: AppInsightsTransport,
+        targets: Sequence[Mapping[str, str]],
+        reference_time: datetime,
+    ) -> None:
+        self._component = component
+        self._telemetry = resolve_telemetry(component, environment)
+        self._transport = transport
+        self._targets = targets
+        self._reference_time = reference_time
+
+    def fetch_failures(self) -> Iterator[FailureArtifact]:
+        rows = self._transport.run_query(_backlog_stalled_query(self._component))
+        latest: dict[str, tuple[datetime, Mapping[str, object]]] = {}
+        for row in rows:
+            name = str(row.get("name") or "")
+            at = _as_utc(row.get("last_snapshot")) if row.get("last_snapshot") else None
+            if not name or at is None:
+                continue
+            if name not in latest or at > latest[name][0]:
+                latest[name] = (at, row)
+        if not latest:
+            return
+        reference = _as_utc(self._reference_time) or datetime.now(timezone.utc)
+        for target in self._targets:
+            name = str(target.get("name") or "")
+            if not name or not target.get("stall_after"):
+                continue
+            stall_after = parse_duration_seconds(str(target["stall_after"]), "stall_after")
+            last, row = latest.get(name, (None, None))
+            if row is not None:
+                age = _seconds(row.get("oldest_pending_age_seconds"))
+                if age is not None and age > stall_after:
+                    yield self._stalled(target, last, row, age)
+            silent_after = target.get("silent_after")
+            if silent_after:
+                window = parse_duration_seconds(str(silent_after), "silent_after")
+                if last is None or last < reference - timedelta(seconds=window):
+                    yield self._silent(target, last, row, reference)
+
+    def _artifact(
+        self, name: str, failure_class: str, observed_text: str, context: dict
+    ) -> FailureArtifact:
+        artifact = FailureArtifact.from_target(
+            component=self._component,
+            check_type="backlog-stalled",
+            target={"name": name},
+            failure_class=failure_class,
+            failure_signature=name,
+            observed_text=observed_text,
+        )
+        return redact_artifact(replace(artifact, context=context))
+
+    def _stalled(
+        self,
+        target: Mapping[str, str],
+        last: datetime,
+        row: Mapping[str, object],
+        age: float,
+    ) -> FailureArtifact:
+        name = str(target["name"])
+        observed_text = (
+            f"backlog '{name}': oldest pending item is "
+            f"{_duration_text(timedelta(seconds=age))} old, past stall_after "
+            f"{target['stall_after']} (snapshot at {_iso(last)})"
+        )
+        return self._artifact(
+            name, "stalled-backlog", observed_text, self._context(target, last, row)
+        )
+
+    def _silent(
+        self,
+        target: Mapping[str, str],
+        last: Optional[datetime],
+        row: Optional[Mapping[str, object]],
+        reference: datetime,
+    ) -> FailureArtifact:
+        name = str(target["name"])
+        seen = (
+            f"last snapshot {_iso(last)}, {_duration_text(reference - last)} ago"
+            if last is not None
+            else f"never reported in the last {_BACKLOG_LOOKBACK}"
+        )
+        observed_text = (
+            f"backlog '{name}': no {BACKLOG_EVENT_NAME} within silent_after "
+            f"{target['silent_after']} ({seen}); the reporter may have stopped"
+        )
+        return self._artifact(
+            name, "silent-backlog", observed_text, self._context(target, last, row)
+        )
+
+    def _context(
+        self,
+        target: Mapping[str, str],
+        last: Optional[datetime],
+        row: Optional[Mapping[str, object]],
+    ) -> dict:
+        thresholds = f"stall_after: {target['stall_after']}"
+        if target.get("silent_after"):
+            thresholds += f"\nsilent_after: {target['silent_after']}"
+        context = {"Thresholds": thresholds}
+        if last is not None and row is not None:
+            lines = [f"snapshot at (UTC): {_iso(last)}"]
+            age = _seconds(row.get("oldest_pending_age_seconds"))
+            if age is not None:
+                lines.append(
+                    f"oldest pending age: {_duration_text(timedelta(seconds=age))} "
+                    f"({int(age)}s)"
+                )
+            count = _count(row.get("pending_count"))
+            if count is not None:
+                lines.append(f"pending count: {count}")
+            context["Latest snapshot"] = "\n".join(lines)
+        context["Investigate"] = (
+            "AppEvents\n"
+            f"| where AppRoleName == '{_kql_literal(self._component)}' "
+            f"and Name == '{BACKLOG_EVENT_NAME}'\n"
+            f"| where tostring(Properties.{BACKLOG_NAME_PROPERTY}) == "
+            f"'{_kql_literal(str(target['name']))}'\n"
+            f"| project TimeGenerated, Properties.{BACKLOG_AGE_PROPERTY}, "
+            f"Properties.{BACKLOG_COUNT_PROPERTY}\n"
+            "| order by TimeGenerated desc"
+        )
+        return context
+
+
 def build_app_insights_transport(
     *, workspace_id: str, credential: object
 ) -> AppInsightsTransport:

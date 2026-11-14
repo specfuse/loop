@@ -176,6 +176,25 @@ unsatisfiable on real input and would force the operator to fix unrelated
 instrumentation gaps before they could even see a draft. The audit informs the
 operator about diagnosability gaps; it never blocks the draft from being produced.
 
+**Data-store work queues and `backlog-emission` (#3576).** Step 1 also looks,
+inside each deployable's scope, for work queues the component keeps in its own
+data store rather than in a broker: a transactional outbox table, a job or
+pending-work table, a poller loop draining one. Each is a `backlog` trigger in
+the project's pattern table and becomes one entry in the record's `backlogs`
+list. `dlq` and `queue-stalled` cannot see such a queue (its rows never reach
+the broker), and `heartbeat` only proves the poller fired. For each component
+with backlogs, check its own code for the rule's backlog-snapshot emission — a
+`BacklogSnapshot` custom event per backlog, carrying `backlogName`,
+`oldestPendingAgeSeconds` and optionally `pendingCount`, under the component's
+role name (the marker is that event name unless the pattern table names the
+project's own emitter). With the emission, propose one `backlog-stalled` check
+with one target per backlog, `name` set to the emitted `backlogName` and
+`stall_after: 15m` as a starting value. Without it, propose no check and report
+one `backlog-emission` finding naming the backlogs: a target over telemetry
+nothing emits would never fire. The reference behaviour is
+`suggest_checks` / `audit_diagnosability` in
+`tests/test_derive_monitoring_discovery.py`.
+
 ### Step 3 — Ask only what the repo cannot answer
 
 The legitimate question set is small and is batched into **one round**, presented
@@ -221,6 +240,12 @@ together with the evidence that motivated each:
    backlogs, business-state invariants, migration state — when Step 2's evidence
    could not tell. An answer of "none" is a `data-store-signals` finding, never
    a prompt to draft a check that reads the store.
+7. **Each proposed `backlog-stalled` target's thresholds** — confirm or change
+   the starting `stall_after: 15m` (how old the oldest pending item may get
+   before it counts as stalled), and whether to add a `silent_after` (how long
+   without any snapshot before the reporter counts as dead; a few times the
+   emission interval). How long is too long is operator judgement, not
+   evidence.
 
 **Forbidden questions** — anything answerable by reading a file. "What components
 does this project deploy?" when a deployment manifest names every one is a skill

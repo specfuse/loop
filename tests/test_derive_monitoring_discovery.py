@@ -80,7 +80,10 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
     matched ``subscription`` trigger sets ``message_consuming`` and appends a
     ``{subscription, function}`` entry to the record's ``subscriptions`` list;
     a matched ``schedule`` trigger appends a ``{name, cron, timezone, dialect}``
-    entry to ``schedules``. ``http_serving`` and ``message_consuming`` are always
+    entry to ``schedules``; a matched ``backlog`` trigger (a data-store work
+    queue: an outbox or job table, a poller loop) appends a ``{name}`` entry
+    to ``backlogs``, and ``backlog_emission`` records whether the scope shows
+    a ``patterns["diagnosability"]["backlog_emission_markers"]`` hit (#3576). ``http_serving`` and ``message_consuming`` are always
     derived from matched triggers, never read from the candidate.
 
     A record's ``evidence`` is its deployment file(s) plus every scoped file a
@@ -105,6 +108,7 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
         message_consuming = False
         subscriptions = []
         schedules = []
+        backlogs = []
         trigger_evidence = set()
 
         for trigger in patterns.get("triggers", []):
@@ -133,6 +137,8 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
                     "timezone": trigger["timezone"],
                     "dialect": trigger["dialect"],
                 })
+            elif kind == "backlog":
+                backlogs.append({"name": trigger["name"]})
 
         version_markers = patterns.get("diagnosability", {}).get(
             "version_stamping_markers", []
@@ -144,6 +150,16 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
             for marker in version_markers
         )
 
+        emission_markers = patterns.get("diagnosability", {}).get(
+            "backlog_emission_markers", []
+        )
+        backlog_emission = any(
+            marker in content
+            for relpath, content in tree.items()
+            if relpath.startswith(scope_prefix)
+            for marker in emission_markers
+        )
+
         records.append({
             "name": candidate["name"],
             "type": candidate["type"],
@@ -152,10 +168,18 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
             "message_consuming": message_consuming,
             "subscriptions": subscriptions,
             "schedules": schedules,
+            "backlogs": backlogs,
+            "backlog_emission": backlog_emission,
             "evidence": sorted(deployment_evidence | trigger_evidence),
         })
     records.sort(key=lambda r: r["name"])
     return records
+
+
+# The `stall_after` a proposed `backlog-stalled` target starts at (#3576). How
+# long is too long is operator judgement; the skill asks the operator to
+# confirm or change it, and to add a `silent_after`, in its question round.
+BACKLOG_DEFAULT_STALL_AFTER = "15m"
 
 
 def suggest_checks(component: dict) -> list[dict]:
@@ -177,7 +201,12 @@ def suggest_checks(component: dict) -> list[dict]:
     ``version_stamping`` evidence also gets ``http-status-regression`` with
     ``deploy_signal: {kind: app-version}`` and a ``window_after_deploy``; one
     that stamps no version gets none (see the ``version-stamping`` audit
-    finding). ``invariant`` is never suggested — its ``query`` is
+    finding). A component whose record carries data-store ``backlogs`` (an
+    outbox or job table, a poller loop) and ``backlog_emission`` evidence
+    gets ``backlog-stalled`` with one target per backlog at
+    ``BACKLOG_DEFAULT_STALL_AFTER``; one that emits no backlog snapshot gets
+    none (see the ``backlog-emission`` audit finding, #3576).
+    ``invariant`` is never suggested — its ``query`` is
     operator-supplied by definition, so inventing one would be fabricating
     evidence too.
     """
@@ -215,6 +244,15 @@ def suggest_checks(component: dict) -> list[dict]:
         ]
     checks.append(heartbeat)
     checks.append({"type": "error-logs"})
+    backlogs = component.get("backlogs") or []
+    if backlogs and component.get("backlog_emission"):
+        checks.append({
+            "type": "backlog-stalled",
+            "targets": [
+                {"name": b["name"], "stall_after": BACKLOG_DEFAULT_STALL_AFTER}
+                for b in backlogs
+            ],
+        })
     return checks
 
 
@@ -289,6 +327,16 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
                 "heartbeat-emission",
                 f"component '{component['name']}' gets heartbeat targets but "
                 "its code emits no heartbeat event",
+            ))
+
+    for component in components:
+        if component.get("backlogs") and not component.get("backlog_emission"):
+            findings.append(_finding(
+                "backlog-emission",
+                f"component '{component['name']}' keeps a data-store work queue "
+                f"({', '.join(b['name'] for b in component['backlogs'])}) but "
+                "its code emits no backlog snapshot; backlog-stalled cannot "
+                "see it stall",
             ))
 
     for component in components:
@@ -1155,6 +1203,86 @@ class TestHttpStatusRegressionProposal(unittest.TestCase):
     def test_non_http_component_is_quiet(self):
         _, _, findings = self._check_types(_STACK_A_TREE)
         self.assertNotIn("acme-order-worker", " ".join(f["message"] for f in findings))
+
+
+class TestBacklogStalledProposal(unittest.TestCase):
+    """#3576: a data-store-backed work queue (an outbox or job table, a
+    poller loop) found by a `backlog` trigger gets a `backlog-stalled`
+    target only when the component's own code emits the backlog-snapshot
+    event; without the emission it gets no check and one `backlog-emission`
+    WARN — a target over telemetry nothing emits would never fire."""
+
+    _PATTERNS = {
+        **_STACK_A_PATTERNS,
+        "triggers": [
+            *_STACK_A_PATTERNS["triggers"],
+            {"marker": "ACME_A_OUTBOX_TABLE", "kind": "backlog", "name": "acme-event-outbox"},
+            {"marker": "ACME_A_JOB_POLLER", "kind": "backlog", "name": "acme-notification-jobs"},
+        ],
+        "diagnosability": {
+            **_STACK_A_PATTERNS["diagnosability"],
+            "backlog_emission_markers": ["ACME_A_BACKLOG_SNAPSHOT_EMIT"],
+        },
+    }
+
+    @staticmethod
+    def _tree(emits: bool) -> dict:
+        tree = dict(_STACK_A_TREE)
+        tree["services/worker/outbox.txt"] = (
+            "ACME_A_OUTBOX_TABLE drained by a poller\n"
+            "ACME_A_JOB_POLLER notification jobs\n"
+            + ("ACME_A_BACKLOG_SNAPSHOT_EMIT every minute\n" if emits else "")
+        )
+        return tree
+
+    def _worker(self, tree):
+        components = discover_components(tree, self._PATTERNS)
+        worker = next(c for c in components if c["name"] == "acme-order-worker")
+        findings = [
+            f
+            for f in audit_diagnosability(tree, components, self._PATTERNS)
+            if f["check"] == "backlog-emission"
+        ]
+        return worker, suggest_checks(worker), findings
+
+    def test_proposes_one_target_per_backlog_when_emitted(self):
+        worker, checks, findings = self._worker(self._tree(emits=True))
+        self.assertEqual(
+            [b["name"] for b in worker["backlogs"]],
+            ["acme-event-outbox", "acme-notification-jobs"],
+        )
+        proposed = [c for c in checks if c["type"] == "backlog-stalled"]
+        self.assertEqual(len(proposed), 1)
+        self.assertEqual(
+            [t["name"] for t in proposed[0]["targets"]],
+            ["acme-event-outbox", "acme-notification-jobs"],
+        )
+        for target in proposed[0]["targets"]:
+            self.assertIn("stall_after", target)
+        self.assertEqual(findings, [])
+        text = render_monitoring_yml(
+            [{"name": "acme-order-worker", "type": "queue-consumer", "checks": checks}]
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "monitoring.yml"
+            path.write_text(text)
+            self.assertEqual(validate_monitoring(path), [])
+
+    def test_missing_emission_is_a_gap_not_a_check(self):
+        _, checks, findings = self._worker(self._tree(emits=False))
+        self.assertNotIn("backlog-stalled", [c["type"] for c in checks])
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["severity"], "WARN")
+        self.assertIn("acme-order-worker", findings[0]["message"])
+
+    def test_component_without_backlogs_is_quiet(self):
+        components = discover_components(_STACK_A_TREE, _STACK_A_PATTERNS)
+        self.assertFalse(any(c.get("backlogs") for c in components))
+        findings = audit_diagnosability(_STACK_A_TREE, components, _STACK_A_PATTERNS)
+        self.assertNotIn("backlog-emission", {f["check"] for f in findings})
+        for component in components:
+            types = {c["type"] for c in suggest_checks(component)}
+            self.assertNotIn("backlog-stalled", types)
 
 
 class TestAutofixQuotedInEmittedYaml(unittest.TestCase):
