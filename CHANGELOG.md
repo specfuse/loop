@@ -26,6 +26,21 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.33.0+umbrella.0.17.0] - 2026-11-14
+
+### Added
+
+- monitoring.yml gains a backlog-stalled check type: a component reports each work queue it keeps in its own data store (outbox or job table) as a BacklogSnapshot event, and the App Insights adapter files one finding per backlog when its oldest pending item passes stall_after, or when no snapshot arrives within the optional silent_after. The emission contract is in design-for-diagnosis.md, and /derive-monitoring proposes a target per discovered backlog or flags a missing emission. (#3576)
+- monitor: `dependency-regression` check type. Within `window_after_deploy` after a deployment, a (dependency type, target) pair with at least `min_failures` failed calls (default 5) and 3x its pre-deploy failure rate files one finding per deployment, read from App Insights `AppDependencies` scoped to the role name and app version. Shares the `deploy_signal` block with `http-status-regression`; `/derive-monitoring` proposes it for components with a version stamp and a data store. Failures only: latency is out of scope by decision. (#3577)
+
+### Changed
+
+- Monitoring scope: a component data store is monitored through the component, never directly. The design-for-diagnosis rule and the monitoring schema doc state the boundary, and derive-monitoring audits data-store components for owned signals (data-store-signals) and routes platform health to infrastructure alerting. (#3578)
+
+### Fixed
+
+- `specfuse monitor run` no longer crashes with `TruncatedListingError` once a repo holds 100+ finding issues: the listing limit is raised to 2000, and a filing error is now reported per component instead of aborting the whole run (#3579)
+
 ## [0.32.0+umbrella.0.17.0] - 2026-11-03
 
 ### Fixed
