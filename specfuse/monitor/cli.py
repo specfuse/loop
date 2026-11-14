@@ -678,11 +678,24 @@ def run_cycle(
                         continue
                     filed_fingerprints.add(fingerprint)
                     recorder = _CallRecorder(gh_runner)
-                    record_finding(
-                        fingerprint, artifact, repo, runner=recorder, now=now.timestamp(),
-                        message_ids=tuple(message_ids.get(fingerprint, ())),
-                        seen=seen_by_fingerprint.get(fingerprint), ensure_label=ensure_label,
-                    )
+                    # #3579: a filing error (a truncated listing, a gh failure)
+                    # is isolated like a check error (#3478): reported, the
+                    # watermark held so the window is retried, other
+                    # components still filed.
+                    try:
+                        record_finding(
+                            fingerprint, artifact, repo, runner=recorder, now=now.timestamp(),
+                            message_ids=tuple(message_ids.get(fingerprint, ())),
+                            seen=seen_by_fingerprint.get(fingerprint), ensure_label=ensure_label,
+                        )
+                    except Exception as exc:  # noqa: BLE001 — isolation is the point
+                        env_errored = True
+                        errored_components.add(component_name)
+                        summary.append(
+                            f"{env_name}/{component_name}: filing errored — "
+                            f"{type(exc).__name__}: {exc}"
+                        )
+                        continue
                     outcome = _classify(recorder)
                     if outcome == "created":
                         created += 1
@@ -719,7 +732,7 @@ def run_cycle(
         if env_errored:
             any_errored = True
             summary.append(
-                f"environment {env_name}: watermark not advanced — a check errored; "
+                f"environment {env_name}: watermark not advanced — a check or filing errored; "
                 "its window is retried next cycle"
             )
         elif not dry_run:

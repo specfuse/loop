@@ -57,7 +57,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, FINDING_LABEL, find_finding_issue
+from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, FINDING_LABEL, FINDING_LIST_LIMIT, find_finding_issue
 
 # Reserved for FEAT-2026-0042 gate 2: applied to a finding issue once a fired
 # autofix attempt is known to have failed. See module docstring.
@@ -94,7 +94,7 @@ def has_prior_attempt(runner: Callable, repo: str, fingerprint: str) -> bool:
     (the runner raises, the listing is truncated) fails closed: True.
     """
     try:
-        issue = find_finding_issue(runner, repo, fingerprint, limit=DEFAULT_LIST_LIMIT)
+        issue = find_finding_issue(runner, repo, fingerprint, limit=FINDING_LIST_LIMIT)
     except Exception:  # noqa: BLE001 - fail closed on any read failure
         return True
     if issue is None:
@@ -119,7 +119,7 @@ def record_attempt(
     under a different convention.
     """
     now = time.time() if now is None else now
-    issue = find_finding_issue(runner, repo, fingerprint, limit=DEFAULT_LIST_LIMIT)
+    issue = find_finding_issue(runner, repo, fingerprint, limit=FINDING_LIST_LIMIT)
     if issue is None:
         raise LookupError(f"no finding issue carries fingerprint {fingerprint!r}")
 

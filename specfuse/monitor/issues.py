@@ -70,6 +70,12 @@ REOPENED_MARKER = "<!-- specfuse:finding-reopened -->"
 REDIAGNOSE_LABEL = "rediagnose"
 
 DEFAULT_LIST_LIMIT = 100
+# The finding lookups' own limit, apart from DEFAULT_LIST_LIMIT (which triage
+# borrows as a page size). `gh issue list` pages internally and stops when the
+# repo runs out, so a high limit costs nothing on a small repo. 100 was low
+# enough that a busy project crossed it and every new fingerprint raised
+# TruncatedListingError (#3579); a full page at this limit still raises.
+FINDING_LIST_LIMIT = 2000
 DEFAULT_THROTTLE_SECONDS = 6 * 60 * 60
 # A finding with no sighting for this long is annotated as a close candidate
 # (#3502). Elapsed time, not a run count: the meta records when a fingerprint
@@ -330,7 +336,7 @@ def find_finding_issue(
     repo: str,
     fingerprint: str,
     *,
-    limit: int = DEFAULT_LIST_LIMIT,
+    limit: int = FINDING_LIST_LIMIT,
     now: Optional[float] = None,
 ) -> Optional[dict]:
     """Return the listing row carrying `fingerprint`'s marker, or None.
@@ -376,7 +382,7 @@ def record_finding(
     *,
     runner: Optional[Callable] = None,
     now: Optional[float] = None,
-    limit: int = DEFAULT_LIST_LIMIT,
+    limit: int = FINDING_LIST_LIMIT,
     throttle_seconds: float = DEFAULT_THROTTLE_SECONDS,
     message_ids: Sequence[str] = (),
     seen: Optional[SeenThisRun] = None,
@@ -501,7 +507,7 @@ def finding_component(body: str) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def list_finding_issues(runner: Callable, repo: str, *, now: float, limit: int = DEFAULT_LIST_LIMIT) -> list:
+def list_finding_issues(runner: Callable, repo: str, *, now: float, limit: int = FINDING_LIST_LIMIT) -> list:
     """Open finding issues plus those closed inside the lookup window, each
     carrying its `state` — the same single listing `find_finding_issue` reads."""
     return _list_findings(runner, repo, limit=limit, now=now)
@@ -523,7 +529,7 @@ def annotate_if_quiet(
     now: float,
     quiet_after_seconds: float = DEFAULT_QUIET_AFTER_SECONDS,
     runner: Optional[Callable] = None,
-    limit: int = DEFAULT_LIST_LIMIT,
+    limit: int = FINDING_LIST_LIMIT,
     existing: Optional[dict] = None,
 ) -> Optional[str]:
     """Annotate an open finding issue as a close candidate once its fingerprint
