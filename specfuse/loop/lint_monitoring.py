@@ -47,6 +47,7 @@ AUTOFIX_VALUES = frozenset({"off", "on"})
 CHECK_TYPES = frozenset(
     {
         "backlog-stalled",
+        "dependency-regression",
         "dlq",
         "error-logs",
         "http-5xx",
@@ -270,6 +271,8 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
                     f"'backlog-stalled' check requires 'targets' — each target "
                     f"needs 'name' and 'stall_after'"
                 )
+        elif check_type == "dependency-regression":
+            findings.extend(_check_dependency_regression(check, component_label, index))
         elif check_type == "invariant":
             for field in ("query", "fingerprint_by"):
                 if not check.get(field):
@@ -298,13 +301,10 @@ _TARGET_REQUIRED_FIELDS = {
 DEPLOY_SIGNAL_KINDS = frozenset({"app-version"})
 
 
-def _check_http_status_regression(
-    check: dict, component_label: str, check_index: int
-) -> list[str]:
-    """Field rules for one `http-status-regression` check (`targets` is
-    rejected by `_check_targets`)."""
-    where = f"component '{component_label}': checks[{check_index}]"
-    prefix = f"{where}: 'http-status-regression' check"
+def _check_deploy_window(check: dict, prefix: str) -> list[str]:
+    """The deploy-correlated block every deployment-windowed check type shares
+    (`http-status-regression`, `dependency-regression`): a `deploy_signal`
+    mapping with a known `kind`, and a `window_after_deploy` duration."""
     findings: list[str] = []
 
     signal = check.get("deploy_signal")
@@ -329,6 +329,17 @@ def _check_http_status_regression(
                 f"{prefix} 'window_after_deploy' value {window!r} is not a "
                 f"valid duration — expected {DURATION_GRAMMAR}"
             )
+    return findings
+
+
+def _check_http_status_regression(
+    check: dict, component_label: str, check_index: int
+) -> list[str]:
+    """Field rules for one `http-status-regression` check (`targets` is
+    rejected by `_check_targets`)."""
+    where = f"component '{component_label}': checks[{check_index}]"
+    prefix = f"{where}: 'http-status-regression' check"
+    findings = _check_deploy_window(check, prefix)
 
     codes = check.get("codes")
     if codes is not None:
@@ -348,9 +359,47 @@ def _check_http_status_regression(
     return findings
 
 
+def _check_dependency_regression(
+    check: dict, component_label: str, check_index: int
+) -> list[str]:
+    """Field rules for one `dependency-regression` check (#3577): the shared
+    deploy block, an optional `dependency_types` list (default: every type
+    the component records) and an optional `min_failures` floor (default 5).
+    `targets` is rejected by `_check_targets`."""
+    where = f"component '{component_label}': checks[{check_index}]"
+    prefix = f"{where}: 'dependency-regression' check"
+    findings = _check_deploy_window(check, prefix)
+
+    types = check.get("dependency_types")
+    if types is not None:
+        if (
+            not isinstance(types, list)
+            or not types
+            or not all(isinstance(t, str) and t.strip() for t in types)
+        ):
+            findings.append(
+                f"{prefix} 'dependency_types' must be a non-empty list of "
+                f"dependency type names (e.g. [SQL]) — omit it for every type"
+            )
+        elif len({t.lower() for t in types}) != len(types):
+            findings.append(f"{prefix} 'dependency_types' must not contain duplicates")
+
+    min_failures = check.get("min_failures")
+    if min_failures is not None and (
+        not isinstance(min_failures, int)
+        or isinstance(min_failures, bool)
+        or min_failures < 1
+    ):
+        findings.append(
+            f"{prefix} 'min_failures' must be an integer of at least 1, "
+            f"got {min_failures!r}"
+        )
+    return findings
+
+
 # Check types that must never carry `targets` at all.
 _TARGETLESS_CHECK_TYPES = frozenset(
-    {"error-logs", "http-5xx", "http-status-regression", "invariant"}
+    {"dependency-regression", "error-logs", "http-5xx", "http-status-regression", "invariant"}
 )
 
 

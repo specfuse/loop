@@ -160,11 +160,21 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
             for marker in emission_markers
         )
 
+        # A recorded data-store dependency (#3577): the component's own scope
+        # shows a client of the store it owns.
+        data_store = any(
+            marker in content
+            for relpath, content in tree.items()
+            if relpath.startswith(scope_prefix)
+            for marker in patterns.get("data_store_markers", [])
+        )
+
         records.append({
             "name": candidate["name"],
             "type": candidate["type"],
             "http_serving": http_serving,
             "version_stamping": version_stamping,
+            "data_store": data_store,
             "message_consuming": message_consuming,
             "subscriptions": subscriptions,
             "schedules": schedules,
@@ -205,7 +215,11 @@ def suggest_checks(component: dict) -> list[dict]:
     outbox or job table, a poller loop) and ``backlog_emission`` evidence
     gets ``backlog-stalled`` with one target per backlog at
     ``BACKLOG_DEFAULT_STALL_AFTER``; one that emits no backlog snapshot gets
-    none (see the ``backlog-emission`` audit finding, #3576).
+    none (see the ``backlog-emission`` audit finding, #3576). Any component, HTTP-serving or not, whose record carries both
+    ``version_stamping`` and ``data_store`` evidence also gets
+    ``dependency-regression`` with the same ``deploy_signal`` and a
+    ``window_after_deploy``; ``dependency_types`` is left at its default (all
+    types) because the store's type name is stack-specific (#3577).
     ``invariant`` is never suggested — its ``query`` is
     operator-supplied by definition, so inventing one would be fabricating
     evidence too.
@@ -219,6 +233,12 @@ def suggest_checks(component: dict) -> list[dict]:
                 "deploy_signal": {"kind": "app-version"},
                 "window_after_deploy": "30m",
             })
+    if component.get("version_stamping") and component.get("data_store"):
+        checks.append({
+            "type": "dependency-regression",
+            "deploy_signal": {"kind": "app-version"},
+            "window_after_deploy": "1h",
+        })
     if component.get("message_consuming"):
         subscriptions = component.get("subscriptions") or []
         if subscriptions:
@@ -345,6 +365,19 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
                 "version-stamping",
                 f"component '{component['name']}' serves HTTP but shows no "
                 "per-deployment version stamp; http-status-regression cannot "
+                "detect its deployments",
+            ))
+
+    for component in components:
+        if (
+            component.get("data_store")
+            and not component.get("http_serving")
+            and not component.get("version_stamping")
+        ):
+            findings.append(_finding(
+                "version-stamping",
+                f"component '{component['name']}' calls a data store but shows "
+                "no per-deployment version stamp; dependency-regression cannot "
                 "detect its deployments",
             ))
 
@@ -1452,6 +1485,92 @@ class TestSkillNamesTheCredentialReuseCheck(unittest.TestCase):
                 self.assertIn("credential-reuse", text)
                 self.assertIn("monitoring-secrets-checklist.md", text)
                 self.assertIn("heuristic", text)
+
+
+class TestDependencyRegressionProposal(unittest.TestCase):
+    """#3577: `dependency-regression` is proposed for any component — HTTP or
+    not — with both a deploy signal (version-stamping evidence) and a
+    recorded data-store dependency (``data_store_markers`` evidence in its
+    own scope). A data-store component with no stamp gets no check and one
+    `version-stamping` WARN naming the check it cannot have."""
+
+    _PATTERNS = {
+        **_STACK_A_PATTERNS,
+        "data_store_markers": ["ACME_A_DATA_STORE_CLIENT"],
+        "diagnosability": {
+            **_STACK_A_PATTERNS["diagnosability"],
+            "version_stamping_markers": ["ACME_A_VERSION_STAMP"],
+        },
+    }
+
+    def _discover(self, extra):
+        tree = {**_STACK_A_TREE, **extra}
+        components = discover_components(tree, self._PATTERNS)
+        findings = [
+            f
+            for f in audit_diagnosability(tree, components, self._PATTERNS)
+            if f["check"] == "version-stamping"
+        ]
+        return {c["name"]: c for c in components}, findings
+
+    def test_proposed_with_deploy_signal_and_data_store(self):
+        by_name, findings = self._discover({
+            "services/worker/version.txt": "ACME_A_VERSION_STAMP build-injected\n",
+            "services/worker/store.txt": "ACME_A_DATA_STORE_CLIENT orders db\n",
+        })
+        worker = by_name["acme-order-worker"]
+        self.assertTrue(worker["data_store"])
+        self.assertFalse(by_name["acme-web-api"]["data_store"])
+        checks = suggest_checks(worker)
+        proposed = [c for c in checks if c["type"] == "dependency-regression"]
+        self.assertEqual(len(proposed), 1)
+        self.assertEqual(proposed[0]["deploy_signal"], {"kind": "app-version"})
+        self.assertIn("window_after_deploy", proposed[0])
+        self.assertNotIn("acme-order-worker", " ".join(f["message"] for f in findings))
+        text = render_monitoring_yml(
+            [{"name": "acme-order-worker", "type": "queue-consumer", "checks": checks}]
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "monitoring.yml"
+            path.write_text(text)
+            self.assertEqual(validate_monitoring(path), [])
+
+    def test_not_proposed_without_a_data_store(self):
+        by_name, _ = self._discover({
+            "services/worker/version.txt": "ACME_A_VERSION_STAMP build-injected\n",
+        })
+        checks = suggest_checks(by_name["acme-order-worker"])
+        self.assertNotIn("dependency-regression", [c["type"] for c in checks])
+
+    def test_data_store_without_a_stamp_is_one_warn_and_no_check(self):
+        by_name, findings = self._discover({
+            "services/worker/store.txt": "ACME_A_DATA_STORE_CLIENT orders db\n",
+        })
+        checks = suggest_checks(by_name["acme-order-worker"])
+        self.assertNotIn("dependency-regression", [c["type"] for c in checks])
+        worker_findings = [f for f in findings if "acme-order-worker" in f["message"]]
+        self.assertEqual(len(worker_findings), 1)
+        self.assertEqual(worker_findings[0]["severity"], "WARN")
+        self.assertIn("dependency-regression", worker_findings[0]["message"])
+
+    def test_http_component_gets_both_regression_checks(self):
+        by_name, findings = self._discover({
+            "services/web/version.txt": "ACME_A_VERSION_STAMP build-injected\n",
+            "services/web/store.txt": "ACME_A_DATA_STORE_CLIENT orders db\n",
+        })
+        types = [c["type"] for c in suggest_checks(by_name["acme-web-api"])]
+        self.assertIn("http-status-regression", types)
+        self.assertIn("dependency-regression", types)
+        self.assertEqual(findings, [])
+
+    def test_skill_and_prompt_name_the_proposal(self):
+        root = Path(__file__).resolve().parent.parent
+        for rel in ("plugins/specfuse/skills/derive-monitoring/SKILL.md",
+                    "plugins/specfuse/skills/derive-monitoring/PROMPT.md"):
+            with self.subTest(rel=rel):
+                text = (root / rel).read_text(encoding="utf-8")
+                self.assertTrue("dependency-regression" in text, rel)
+                self.assertTrue("data_store_markers" in text, rel)
 
 
 if __name__ == "__main__":

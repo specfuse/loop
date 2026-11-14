@@ -38,7 +38,7 @@ the shipped GitHub Actions template — see
 itself.
 
 **What it reads.** `.specfuse/monitoring.yml`: each component's checks
-(`error-logs`, `http-5xx`, `http-status-regression`, `dlq`, `queue-stalled`,
+(`error-logs`, `http-5xx`, `http-status-regression`, `dependency-regression`, `dlq`, `queue-stalled`,
 `backlog-stalled`,
 `heartbeat`, `invariant`), each environment's telemetry and broker bindings.
 Event-history checks read only what arrived since the previous run (the
