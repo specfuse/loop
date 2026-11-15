@@ -1012,6 +1012,14 @@ def _parse_heartbeat_timestamp(value: object) -> Optional[datetime]:
     return datetime.fromisoformat(text)
 
 
+# A timer host can fire a hair before its scheduled instant (#3564: an Azure
+# Functions `0 */5 * * * *` timer logged 03:59:59.999 for a 04:00:00 firing).
+# A heartbeat this close before the expected firing counts as that firing. Kept
+# to seconds, not minutes, so a missed firing on a one-minute or sub-minute
+# schedule is still caught.
+HEARTBEAT_EARLY_FIRING_TOLERANCE = timedelta(seconds=5)
+
+
 class HeartbeatAdapter:
     """``TelemetryAdapter`` for the ``heartbeat`` check type
     (FEAT-2026-0040/T07).
@@ -1022,7 +1030,8 @@ class HeartbeatAdapter:
     under its declared dialect (``specfuse.monitor.schedule``, reading T04's
     dialect rather than inferring it) was expected to fire, and compares
     that against the target's last observed heartbeat row. A target that
-    reported in at or after its most recent expected firing yields nothing;
+    reported in at or after its most recent expected firing (less
+    `HEARTBEAT_EARLY_FIRING_TOLERANCE`) yields nothing;
     only a target that has gone silent yields a `FailureArtifact`, built
     through `FailureArtifact.from_target` so its `name` round-trips into
     `target_coordinates` and keeps distinct silent schedules on one
@@ -1091,7 +1100,10 @@ class HeartbeatAdapter:
                 # Pending first firing: emission began after this firing.
                 continue
             observed = last_seen.get(name)
-            if observed is not None and observed >= expected:
+            if (
+                observed is not None
+                and observed >= expected - HEARTBEAT_EARLY_FIRING_TOLERANCE
+            ):
                 continue
             yield self._build_artifact(
                 target, expected, observed, details.get(name, {}), host_last_seen, earliest
