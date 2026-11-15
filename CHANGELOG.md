@@ -26,6 +26,15 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.33.1+umbrella.0.17.0] - 2026-11-15
+
+### Fixed
+
+- `specfuse monitor run`: the `heartbeat` check no longer files a `silent-schedule` finding when a timer fires a fraction of a second before its scheduled instant; a heartbeat up to 5 seconds early counts as that firing. (#3564)
+- `specfuse monitor run`: a `dlq` or `queue-stalled` target whose Service Bus subscription does not exist is now skipped and reported in the run summary; the check keeps reading the other targets instead of failing as a whole. (#3565)
+- `scripts/sync-scaffold.sh` now copies the packaged docs into `specfuse/loop/data/docs/`; the docs list lives in `scripts/sync-scaffold-docs.txt`, which the drift test reads too, so editing a doc and running the sync clears the drift guard (#3585)
+- The derive-monitoring skill no longer claims its diagnosability audit checks "five properties"; it names all eight it audits and states no count (#3586)
+
 ## [0.33.0+umbrella.0.17.0] - 2026-11-14
 
 ### Added
