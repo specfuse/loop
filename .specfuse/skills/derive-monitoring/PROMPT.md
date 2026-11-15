@@ -31,7 +31,7 @@ stdout for the user to review.
 Read these in the loop scaffold under this repo's `.specfuse/` before acting:
 
 - `.specfuse/skills/derive-monitoring/SKILL.md` — the binding method.
-- `.specfuse/rules/design-for-diagnosis.md` — the five diagnosability
+- `.specfuse/rules/design-for-diagnosis.md` — the diagnosability
   properties the audit checks against.
 - `.specfuse/monitoring.yml.example` and
   `.specfuse/monitoring.overrides.yml.example` — the file shapes.
@@ -74,9 +74,10 @@ check — its `query` is operator-supplied by definition.
 ### Step 2 — Diagnosability audit
 
 Audit the discovered components against
-`.specfuse/rules/design-for-diagnosis.md`'s five properties: correlation-ID
+`.specfuse/rules/design-for-diagnosis.md`'s properties: correlation-ID
 propagation, structured logging, per-component role names, heartbeat
-emission, DLQ failure-context capture. A component given `heartbeat`
+emission, DLQ failure-context capture, version stamping, data-store signals,
+backlog-snapshot emission (each detailed below). A component given `heartbeat`
 targets whose own code emits no `ScheduleHeartbeat` event (schedule name
 in a `scheduleName` property, under its role name) gets a
 `heartbeat-emission` finding — those targets would all report silent. An HTTP-serving component showing no per-deployment version stamp (`version-stamping`) gets one finding and no `http-status-regression` check; with the stamp it gets that check (`deploy_signal: {kind: app-version}`, a `window_after_deploy`).

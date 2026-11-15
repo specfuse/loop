@@ -133,9 +133,11 @@ diverging into two different things.
 ### Step 2 — Diagnosability audit
 
 Audit the discovered components against
-`.specfuse/rules/design-for-diagnosis.md` (T04)'s five properties: correlation-ID
+`.specfuse/rules/design-for-diagnosis.md` (T04)'s properties: correlation-ID
 propagation, structured logging, per-component role names matching
-`monitoring.yml`, heartbeat emission, and DLQ failure-context capture. The
+`monitoring.yml`, heartbeat emission, DLQ failure-context capture, version
+stamping, data-store signals, and backlog-snapshot emission. The per-component
+ones are detailed below. The
 `heartbeat-emission` property is per-component: any component Step 1 gives
 `heartbeat` targets (it has discovered schedules) must show, in its own code,
 an emission of the rule's heartbeat event — a `ScheduleHeartbeat` custom event
