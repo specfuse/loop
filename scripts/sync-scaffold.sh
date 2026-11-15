@@ -25,7 +25,8 @@
 #      plugins/specfuse/ is the single source of truth. Guarded by
 #      tests/test_skills_vendored_in_sync.py.
 #   3. Package-sync: specfuse/loop/data/ is a byte-for-byte copy of the canonical
-#      .specfuse/ sources. Run this after editing any canonical source, then
+#      .specfuse/ sources, plus the repo docs/ files listed in
+#      scripts/sync-scaffold-docs.txt (copied to specfuse/loop/data/docs/). Run this after editing any canonical source, then
 #      commit and run the drift-guard test (tests/test_scaffold_data_in_sync.py).
 #
 # Usage: scripts/sync-scaffold.sh
@@ -353,9 +354,40 @@ for f in "${FILES[@]}"; do
   sync_file "$f"
 done
 
+# Docs: repo docs/ is canonical for the packaged docs/ copies (#3585). The list
+# lives in sync-scaffold-docs.txt beside this script, which the drift guard
+# (tests/test_scaffold_data_in_sync.py) reads too. A tree with no docs/ (a test
+# fixture) skips the stage; a listed doc missing from docs/ is an error.
+DOCS_MANIFEST="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sync-scaffold-docs.txt"
+docs_checked=0
+echo
+echo "Syncing docs:"
+if [[ -d "$REPO_ROOT/docs" ]]; then
+  while IFS= read -r rel || [[ -n "$rel" ]]; do
+    [[ -z "$rel" || "$rel" == \#* ]] && continue
+    src_path="$REPO_ROOT/$rel"
+    dest_path="$DEST/$rel"
+    if [[ ! -f "$src_path" ]]; then
+      echo "error: canonical doc missing: $rel (listed in $DOCS_MANIFEST)" >&2
+      exit 1
+    fi
+    mkdir -p "$(dirname "$dest_path")"
+    docs_checked=$((docs_checked + 1))
+    if cmp -s "$src_path" "$dest_path" 2>/dev/null; then
+      echo "  unchanged: $rel"
+    else
+      cp "$src_path" "$dest_path"
+      echo "  synced:    $rel"
+      synced=$((synced + 1))
+    fi
+  done < "$DOCS_MANIFEST"
+else
+  echo "  no docs/ at $REPO_ROOT — skipping."
+fi
+
 echo
 if [[ "$synced" -eq 0 ]]; then
-  echo "Scaffold data already in sync (${#FILES[@]} files checked)."
+  echo "Scaffold data already in sync ($((${#FILES[@]} + docs_checked)) files checked)."
 else
   echo "$synced file(s) updated."
 fi
