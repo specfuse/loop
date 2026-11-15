@@ -47,22 +47,18 @@ TRACKED = {
     "schemas/events/spec_issue_routed.schema.json",
 }
 
-# Docs manifest — canonical source is repo docs/, not .specfuse/.
-DOCS_TRACKED = {
-    "docs/glossary.md",
-    "docs/getting-started.md",
-    "docs/methodology.md",
-    "docs/skills.md",
-    "docs/concepts/ralph-lineage.md",
-    "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
-    "docs/concepts/autonomy-stop-classes.md",
-    "docs/concepts/adopting-auto-mode.md",
-    "docs/concepts/monitoring-to-fix.md",
-    "docs/concepts/monitoring-schema.md",
-    "docs/concepts/monitoring-runners.md",
-    "docs/lifecycles.md",
-    "docs/flows.html",
-}
+# Docs manifest — canonical source is repo docs/, not .specfuse/. Read from
+# the same list scripts/sync-scaffold.sh copies from (#3585), so the sync and
+# this guard cannot disagree about which docs are packaged.
+DOCS_MANIFEST = REPO_ROOT / "scripts" / "sync-scaffold-docs.txt"
+
+
+def _read_docs_manifest() -> set:
+    lines = DOCS_MANIFEST.read_text(encoding="utf-8").splitlines()
+    return {line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")}
+
+
+DOCS_TRACKED = _read_docs_manifest()
 
 # Unmirrored manifest — files authored directly under specfuse/loop/data/
 # with no canonical .specfuse/ or docs/ counterpart to byte-match against.

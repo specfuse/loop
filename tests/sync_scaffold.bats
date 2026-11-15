@@ -310,3 +310,49 @@ git_core_pushed() {  # core is a git work tree with an upstream, fully pushed
   [ "$status" -eq 0 ]
   [[ "$(cat "$TESTDIR/.specfuse/rules/verification-discipline.md")" == *"verifdisc"* ]]
 }
+
+# #3585: repo docs/ files listed in scripts/sync-scaffold-docs.txt are copied
+# into specfuse/loop/data/docs/, so editing a doc and running the sync is
+# enough to clear the drift guard.
+DOCS_MANIFEST="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/scripts/sync-scaffold-docs.txt"
+
+seed_docs() {
+  while IFS= read -r rel; do
+    [[ -z "$rel" || "$rel" == \#* ]] && continue
+    mkdir -p "$TESTDIR/$(dirname "$rel")"
+    printf 'doc %s\n' "$rel" > "$TESTDIR/$rel"
+  done < "$DOCS_MANIFEST"
+}
+
+@test "sync copies every listed doc into specfuse/loop/data/docs/" {
+  seed_docs
+  REPO_ROOT="$TESTDIR" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  while IFS= read -r rel; do
+    [[ -z "$rel" || "$rel" == \#* ]] && continue
+    cmp -s "$TESTDIR/$rel" "$TESTDIR/specfuse/loop/data/$rel"
+  done < "$DOCS_MANIFEST"
+}
+
+@test "sync updates a stale packaged doc" {
+  seed_docs
+  mkdir -p "$TESTDIR/specfuse/loop/data/docs/concepts"
+  printf 'stale\n' > "$TESTDIR/specfuse/loop/data/docs/concepts/monitoring-schema.md"
+  REPO_ROOT="$TESTDIR" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$TESTDIR/specfuse/loop/data/docs/concepts/monitoring-schema.md")" = "doc docs/concepts/monitoring-schema.md" ]
+}
+
+@test "a listed doc missing from docs/ fails the sync" {
+  seed_docs
+  rm "$TESTDIR/docs/flows.html"
+  REPO_ROOT="$TESTDIR" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"docs/flows.html"* ]]
+}
+
+@test "a tree with no docs/ directory skips the docs stage" {
+  REPO_ROOT="$TESTDIR" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ ! -d "$TESTDIR/specfuse/loop/data/docs" ]
+}
