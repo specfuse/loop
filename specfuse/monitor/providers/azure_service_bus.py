@@ -194,6 +194,23 @@ class DeadLetterMessage(Protocol):
     dead_letter_error_description: str
 
 
+# What the Azure SDK raises for a subscription that does not exist (#3565):
+# `azure.servicebus.exceptions.MessagingEntityNotFoundError` from a peek,
+# `azure.core.exceptions.ResourceNotFoundError` from a management read.
+# Matched by class name so this module needs no Azure SDK import.
+_MISSING_ENTITY_ERRORS = frozenset(
+    {"MessagingEntityNotFoundError", "ResourceNotFoundError"}
+)
+
+
+def _is_missing_entity(exc: BaseException) -> bool:
+    return any(cls.__name__ in _MISSING_ENTITY_ERRORS for cls in type(exc).__mro__)
+
+
+def _missing_reason(exc: BaseException) -> str:
+    return f"subscription not found ({type(exc).__name__})"
+
+
 class ServiceBusDlqTransport(Protocol):
     """The peek-only operation this adapter needs from a transport."""
 
@@ -226,15 +243,28 @@ class ServiceBusDlqAdapter:
         self._transport = transport
         self._targets = targets
         self._max_message_count = max_message_count
+        self.skipped_targets: List[SkippedTarget] = []
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
         for target in self._targets:
             subscription = target["subscription"]
             function = target["function"]
-            messages = self._transport.peek_dead_letter_messages(
-                subscription=subscription,
-                max_message_count=self._max_message_count,
-            )
+            try:
+                messages = list(
+                    self._transport.peek_dead_letter_messages(
+                        subscription=subscription,
+                        max_message_count=self._max_message_count,
+                    )
+                )
+            except Exception as exc:
+                if not _is_missing_entity(exc):
+                    raise
+                # A retired or not-yet-deployed subscription is routine: report
+                # it and keep reading the other targets (#3565).
+                self.skipped_targets.append(
+                    SkippedTarget(subscription, function, _missing_reason(exc))
+                )
+                continue
             for message in messages:
                 yield self._build_artifact(subscription, function, message)
 
@@ -291,7 +321,7 @@ def _age_text(seconds: float) -> str:
 
 @dataclass(frozen=True)
 class SkippedTarget:
-    """A `queue-stalled` target the adapter did not evaluate, and why."""
+    """A `dlq` or `queue-stalled` target the adapter did not evaluate, and why."""
 
     subscription: str
     function: str
@@ -352,12 +382,20 @@ class QueueStalledAdapter:
                 continue
 
             stall_after_seconds = parse_stall_after_seconds(stall_after_raw)
-            active_count = self._transport.get_active_message_count(
-                subscription=subscription
-            )
-            oldest_enqueued = self._transport.get_oldest_message_enqueued_time(
-                subscription=subscription
-            )
+            try:
+                active_count = self._transport.get_active_message_count(
+                    subscription=subscription
+                )
+                oldest_enqueued = self._transport.get_oldest_message_enqueued_time(
+                    subscription=subscription
+                )
+            except Exception as exc:
+                if not _is_missing_entity(exc):
+                    raise
+                self.skipped_targets.append(
+                    SkippedTarget(subscription, function, _missing_reason(exc))
+                )
+                continue
             if oldest_enqueued is None:
                 continue
             age_seconds = (self._reference - oldest_enqueued).total_seconds()
