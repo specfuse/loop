@@ -41,26 +41,8 @@ from specfuse.monitor.redaction import redact_artifact, redact_text
 # Credential construction is shared with the other Azure provider and looked up
 # reflectively by the core as `build_credential` (#302).
 from specfuse.monitor.providers._azure_auth import build_credential  # noqa: F401
+from specfuse.monitor.providers._azure_normalize import normalize_message
 from specfuse.monitor.schedule import most_recent_firing
-
-_GUID_RE = re.compile(
-    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
-)
-_TIMESTAMP_RE = re.compile(
-    r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b"
-)
-_NUMBER_RE = re.compile(r"\b\d+\b")
-
-
-def _normalize_message(text: str) -> str:
-    """Strip GUIDs, timestamps, and bare numbers so two occurrences of the
-    same underlying failure — differing only in operation/request IDs and
-    timestamps — collapse to one signature."""
-    text = _GUID_RE.sub("<guid>", text)
-    text = _TIMESTAMP_RE.sub("<timestamp>", text)
-    text = _NUMBER_RE.sub("<num>", text)
-    return " ".join(text.split())
-
 
 class AppInsightsTransport(Protocol):
     """The single operation these adapters need from a transport: run a KQL
@@ -265,14 +247,14 @@ class ErrorLogsAdapter:
     @staticmethod
     def _signature(row: Mapping[str, object]) -> str:
         exception_type = str(row.get("type") or "UnknownException")
-        return f"{exception_type}:{_normalize_message(str(row.get('outerMessage') or ''))}"
+        return f"{exception_type}:{normalize_message(str(row.get('outerMessage') or ''))}"
 
     def _build_artifact(
         self, row: Mapping[str, object], sample_ids: Sequence[str] = ()
     ) -> FailureArtifact:
         exception_type = str(row.get("type") or "UnknownException")
         raw_message = str(row.get("outerMessage") or "")
-        failure_signature = f"{exception_type}:{_normalize_message(raw_message)}"
+        failure_signature = f"{exception_type}:{normalize_message(raw_message)}"
         artifact = FailureArtifact(
             component=self._component,
             check_type="error-logs",
