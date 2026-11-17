@@ -26,6 +26,12 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.33.2+umbrella.0.17.0] - 2026-11-16
+
+### Fixed
+
+- `specfuse monitor run`: Azure failure signatures no longer carry per-occurrence tokens — a GUID followed by `_` (the Service Bus `TrackingId:<guid>_B4` shape), `TrackingId`/`SystemTracker`/`Reference`/`LockToken` values, HTTP `Date:` headers, and stack traces embedded by Functions host wrapper exceptions are normalized away, so repeat occurrences of one failure land on one issue instead of one each. Existing findings whose signature changes are filed once more under the new signature. (#3592)
+
 ## [0.33.1+umbrella.0.17.0] - 2026-11-15
 
 ### Fixed
