@@ -25,7 +25,6 @@ importing this module never requires `azure-servicebus` to be installed
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Iterable, Iterator, List, Mapping, Optional, Protocol, Sequence
@@ -37,23 +36,7 @@ from specfuse.monitor.redaction import redact_artifact
 # Credential construction is shared with the other Azure provider and looked up
 # reflectively by the core as `build_credential` (#302).
 from specfuse.monitor.providers._azure_auth import build_credential  # noqa: F401
-
-_GUID_RE = re.compile(
-    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
-)
-_TIMESTAMP_RE = re.compile(
-    r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b"
-)
-_NUMBER_RE = re.compile(r"\b\d+\b")
-
-
-def _normalize_message(text: str) -> str:
-    """Strip message IDs, timestamps, GUIDs, and sequence numbers so two
-    occurrences of the same poison message collapse to one signature."""
-    text = _GUID_RE.sub("<guid>", text)
-    text = _TIMESTAMP_RE.sub("<timestamp>", text)
-    text = _NUMBER_RE.sub("<num>", text)
-    return " ".join(text.split())
+from specfuse.monitor.providers._azure_normalize import normalize_message
 
 
 def _exception_type_and_message(message: object) -> tuple[str, str]:
@@ -273,7 +256,7 @@ class ServiceBusDlqAdapter:
     ) -> FailureArtifact:
         failure_class = getattr(message, "dead_letter_reason", None) or "Unknown"
         exception_type, raw_message = _exception_type_and_message(message)
-        failure_signature = f"{exception_type}:{_normalize_message(raw_message)}"
+        failure_signature = f"{exception_type}:{normalize_message(raw_message)}"
         observed_text = getattr(message, "dead_letter_error_description", None) or ""
         raw_id = getattr(message, "message_id", None)
         message_id = str(raw_id) if raw_id else None
