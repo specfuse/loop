@@ -99,17 +99,21 @@ def collect(roots: list[Path] | list[str]) -> dict:
 
     for root in roots:
         root_path = Path(root)
-        # Both common layouts: a workspace directory holding repos, and a
-        # directory holding several such workspaces. Pointing at the wrong depth
-        # otherwise returns zero, which an analysis tool must never report as
-        # "no waste" — see `main` for the empty-corpus message.
+        # Three layouts: the repository itself (the default `--roots .` run
+        # from inside one), a workspace directory holding repos, and a
+        # directory holding several such workspaces. Pointing at the wrong
+        # depth otherwise returns zero, which an analysis tool must never
+        # report as "no waste" — see `main` for the empty-corpus message.
         found = sorted(
-            set(root_path.glob("*/.specfuse/features/*/events.jsonl"))
+            set(root_path.glob(".specfuse/features/*/events.jsonl"))
+            | set(root_path.glob("*/.specfuse/features/*/events.jsonl"))
             | set(root_path.glob("*/*/.specfuse/features/*/events.jsonl"))
         )
         for path in found:
             rel = path.relative_to(root_path).parts
             repo = "/".join(rel[:rel.index(".specfuse")]) if ".specfuse" in rel else str(path)
+            if not repo:
+                repo = root_path.resolve().name
             for raw in path.read_text(errors="ignore").splitlines():
                 raw = raw.strip()
                 if not raw:
@@ -260,9 +264,10 @@ def main() -> int:
     )
     parser.add_argument(
         "--roots", nargs="+", default=["."],
-        help="Directories each CONTAINING repositories (default: '.'). Pass a "
-             "workspace root to compare across projects — the cross-repo view "
-             "is what tells you whether one feature is an outlier.",
+        help="Repositories, or directories containing them (default: '.'). "
+             "Pass a workspace root to compare across projects — the "
+             "cross-repo view is what tells you whether one feature is an "
+             "outlier.",
     )
     parser.add_argument("--json", action="store_true", help="Emit raw JSON.")
     parser.add_argument("--min-fires", type=int, default=1,
@@ -276,8 +281,8 @@ def main() -> int:
         # damaging misreading than an error.
         print(
             "no events.jsonl found under: " + ", ".join(args.roots) + "\n"
-            "Pass directories that CONTAIN repositories, e.g. --roots ~/work, "
-            "not a repository itself."
+            "Pass a repository, or a directory containing repositories, "
+            "e.g. --roots ~/work."
         )
         return 1
     if args.json:
