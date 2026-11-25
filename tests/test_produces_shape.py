@@ -93,12 +93,12 @@ class TestLintCatchesProducesShape(unittest.TestCase):
 
     def test_file_produces_is_not_flagged(self):
         self.assertEqual(
-            [f for f in self._lint("src/Regression.java") if "directory" in f], [],
+            [f for f in self._lint("src/Regression.java") if "assert_declared_deliverables" in f], [],
         )
 
     def test_glob_produces_is_not_flagged(self):
         self.assertEqual(
-            [f for f in self._lint("src/**/*.java") if "directory" in f], [],
+            [f for f in self._lint("src/**/*.java") if "assert_declared_deliverables" in f], [],
         )
 
 
