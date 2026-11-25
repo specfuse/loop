@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0250/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -23,6 +23,20 @@ re_arm_history:
     reason: "All test are passing and we can continue"
 model: sonnet
 effort: high
+cumulative_cost_usd: 0.0
+cumulative_duration_seconds: 0.0
+cumulative_input_tokens: 0
+cumulative_output_tokens: 0
+cumulative_attempts: 0
+cost_usd: 1.036303
+duration_seconds: 197.611
+input_tokens: 68
+output_tokens: 25456
+folded_through_re_arm: 1
+verdict: met
+gate_set: plannext
+driver_version: 0.33.2
+started_at: 2026-11-25T17:03:30.162262+00:00
 ---
 
 # G1-CLOSE — terminal close
