@@ -174,11 +174,65 @@ class TestAttemptSplit(unittest.TestCase):
 
 
 class TestBaselineAndBroadPhases(unittest.TestCase):
-    """Clause 3 — owned by T03."""
+    """Clause 3 — baseline and broad phases."""
 
-    @unittest.skip("T03 owns baseline and broad phase gate_result events")
-    def test_phases(self):
-        pass
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.cfg = {"code": [
+            {"name": "ok-gate", "command": "exit 0"},
+            {"name": "bad", "command": "exit 1"},
+        ]}
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _check(self, events, phase, cid):
+        self.assertEqual(len(events), 2)
+        for e in events:
+            self.assertEqual(e["event_type"], "gate_result")
+            self.assertEqual(e["correlation_id"], cid)
+            self.assertEqual(
+                set(e["payload"]),
+                {"attempt", "gate", "ok", "skipped", "duration_seconds", "phase"})
+            self.assertIsNone(e["payload"]["attempt"])
+            self.assertEqual(e["payload"]["phase"], phase)
+        self.assertEqual(
+            sorted(e["payload"]["gate"] for e in events), ["bad", "ok-gate"])
+
+    def test_broad_run_phase(self):
+        ok, failing = loop.run_gate_broad_set(self.root, self.cfg)
+        self.assertFalse(ok)
+        self.assertEqual(set(failing[0]), {
+            "gate", "failure_class", "failure_signature"})
+        self._check(
+            loop.build_phase_gate_events("broad", "FEAT-LOOP-2026-9999"),
+            "broad", "FEAT-LOOP-2026-9999")
+        self.assertEqual(loop.build_phase_gate_events("broad", "X"), [])
+
+    def test_baseline_phase(self):
+        failing = loop.probe_baseline(self.root, self.cfg)
+        self.assertEqual(
+            set(failing[0]), {"gate", "failure_class", "failure_signature"})
+        self._check(
+            loop.build_phase_gate_events("baseline", "FEAT-LOOP-2026-9999/T01"),
+            "baseline", "FEAT-LOOP-2026-9999/T01")
+
+    def test_unchanged_tree_broad_skip_emits_none(self):
+        gate_file = self.root / "GATE-01.md"
+        gate_file.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+        green = {"code": [{"name": "ok-gate", "command": "exit 0"}]}
+        orig = loop._current_tree_hash
+        loop._current_tree_hash = lambda: "tree-abc"
+        try:
+            _, _, ran = loop.gate_broad_run_check(gate_file, self.root, green)
+            self.assertTrue(ran)
+            loop.build_phase_gate_events("broad", "F")
+            _, _, ran = loop.gate_broad_run_check(gate_file, self.root, green)
+            self.assertFalse(ran)
+            self.assertEqual(loop.build_phase_gate_events("broad", "F"), [])
+        finally:
+            loop._current_tree_hash = orig
 
 
 class TestStatsReport(unittest.TestCase):

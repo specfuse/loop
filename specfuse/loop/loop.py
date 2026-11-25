@@ -6759,6 +6759,32 @@ def persist_gate_output(feature_dir: Path, gate_name: str,
         return None
 
 
+# Per-gate results of the most recent fresh baseline probe / broad run
+# (FEAT-LOOP-2026-0250/T03). Side channel so `probe_baseline` and
+# `run_gate_broad_set` keep their return shapes; consumed (and cleared) by
+# `build_phase_gate_events` where the caller owns an event list.
+_PHASE_GATE_RESULTS: dict[str, list] = {"baseline": [], "broad": []}
+
+
+def build_phase_gate_events(phase: str, correlation_id: str) -> list[dict]:
+    """One `gate_result` event per gate the last fresh *phase* run (`baseline`
+    or `broad`) executed, with `attempt: null`. Consumes the recorded results,
+    so a later call without a fresh run returns an empty list."""
+    results = _PHASE_GATE_RESULTS.get(phase) or []
+    _PHASE_GATE_RESULTS[phase] = []
+    events = []
+    for gr in results:
+        events.append(build_event("gate_result", correlation_id, {
+            "attempt": None,
+            "gate": gr["name"],
+            "ok": bool(gr["ok"]),
+            "skipped": bool(gr.get("skipped", False)),
+            "duration_seconds": gr.get("duration_seconds", 0),
+            "phase": phase,
+        }))
+    return events
+
+
 def _run_gate_set(
     gate_set: list, feature_dir: Path,
     _capture_returncodes: "dict | None" = None,
@@ -6949,6 +6975,7 @@ def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bo
     """
     if cfg is None:
         cfg = load_verification()
+    _PHASE_GATE_RESULTS["broad"] = []
     gate_set = cfg.get("code") or []
     if not gate_set:
         return False, [{
@@ -6974,6 +7001,7 @@ def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bo
         }]
     gate_set = resolve_gate_tiers(gate_set, "broad")
     gate_results = _run_gate_set(gate_set, feature_dir)
+    _PHASE_GATE_RESULTS["broad"] = list(gate_results)
     failing = []
     for g in gate_results:
         if g["ok"]:
@@ -7759,6 +7787,7 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
     """
     if cfg is None:
         cfg = load_verification()
+    _PHASE_GATE_RESULTS["baseline"] = []
     gate_set = cfg.get("code") or []
     try:
         gate_set = order_gate_set(gate_set)
@@ -7773,6 +7802,7 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
             ),
         }]
     gate_results = _run_gate_set(gate_set, feature_dir)
+    _PHASE_GATE_RESULTS["baseline"] = list(gate_results)
     failing = []
     for g in gate_results:
         if g["ok"]:
@@ -8273,6 +8303,7 @@ def gate_baseline_check(
             return baseline["failing"], False
     if probed_at is None:
         probed_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    _PHASE_GATE_RESULTS["baseline"] = []
     failing = probe_baseline(feature_dir, cfg)
     write_gate_baseline(
         gate_file, head_sha, probed_at, failing, feature_dir, source=source)
@@ -12094,6 +12125,8 @@ def run(
                                 "ok": _broad_ok,
                                 "failing": _broad_failing,
                             }))
+                        _broad_events.extend(
+                            build_phase_gate_events("broad", feature_id))
                     if not _broad_ok:
                         backend.set_gate(gate, "awaiting_review")
                         escalation_message = format_broad_run_failure(
@@ -13471,6 +13504,8 @@ def run(
                                         "failing": _attr_failing,
                                         "attributed_to": wu.wu_id,
                                     }))
+                                wu_events.extend(
+                                    build_phase_gate_events("baseline", wu.wu_id))
                             if _attr_failing:
                                 # Pre-existing: this attempt did not cause the
                                 # failure, so it is not counted against the

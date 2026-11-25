@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0250/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.50
 produces:
@@ -13,6 +13,13 @@ produces_driver_helper:
   - gate_broad_run_check
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-25T15:29:39.076668+00:00
+duration_seconds: 71.981
+cost_usd: 0.281655
+input_tokens: 20
+output_tokens: 6334
 ---
 
 # T03 — `gate_result` events for the baseline probe and the broad run
