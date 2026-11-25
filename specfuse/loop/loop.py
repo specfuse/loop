@@ -924,6 +924,10 @@ class WorkUnit:
     # claimed — the per-path `produces_unchanged:` justification the contract
     # promises to honour (#3268). None until a session has run.
     result_block: "dict | None" = None
+    # Per-gate results of the latest verify() call (FEAT-LOOP-2026-0250/T01):
+    # side channel so the attempt loop can emit `gate_result` events without
+    # changing the verify_fn call signature. Reset before each attempt.
+    last_gate_results: list = field(default_factory=list)
     # Set by auto_repair_files_changed (FEAT-2026-0103/T03) when a passed
     # attempt's RESULT named untouched paths outside `produces:` that got
     # silently dropped from files_changed. None on every other attempt.
@@ -6795,6 +6799,8 @@ def _run_gate_set(
                     f"### {gate['name']}: SKIP — dependency "
                     f"'{failed_dep}' failed"
                 ),
+                "skipped": True,
+                "duration_seconds": 0,
             })
             continue
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
@@ -6837,6 +6843,7 @@ def _run_gate_set(
                         f"(https://git-scm.com/download/win) so gate commands can "
                         f"run through bash.exe.\n```"
                     ),
+                    "duration_seconds": 0,
                 })
                 continue
             popen_argv = [bash, "-c", command]
@@ -6844,6 +6851,7 @@ def _run_gate_set(
         else:
             popen_argv = command
             popen_kwargs = dict(shell=True)  # nosec B604
+        gate_started = time.monotonic()
         proc = subprocess.Popen(  # nosec B602
             popen_argv, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -6885,6 +6893,7 @@ def _run_gate_set(
                 f"(process group) — a hang (test reading stdin, infinite loop, "
                 f"or a wedged subprocess)."
             ]
+        gate_duration = round(time.monotonic() - gate_started, 3)
         if not ok:
             failed_names.add(gate["name"])
         log_path = persist_gate_output(feature_dir, gate["name"], out)
@@ -6895,6 +6904,7 @@ def _run_gate_set(
             "ok": ok,
             "report": (f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
                        f"```\n$ {command}\n" + "\n".join(tail) + "\n```"),
+            "duration_seconds": gate_duration,
         })
     return results
 
@@ -7723,8 +7733,10 @@ def verify(wu: WorkUnit, feature_dir: Path,
                         f"is not a work-unit failure — fix "
                         f"{Path(gate_file).name} and re-run."
                     ),
+                    "duration_seconds": g.get("duration_seconds", 0),
                 }
                 break
+    wu.last_gate_results = list(gate_results)
     ok_all = all(g["ok"] for g in gate_results)
     for note in fallback_notes:
         print(f"  {note}", file=sys.stderr)
@@ -8320,6 +8332,23 @@ def _accepts_gate_file(fn) -> bool:
         p.name == "gate_file" or p.kind is inspect.Parameter.VAR_KEYWORD
         for p in params.values()
     )
+
+
+def build_attempt_gate_events(wu: "WorkUnit", attempt: int) -> list[dict]:
+    """One `gate_result` event per gate `verify()` ran for this attempt
+    (FEAT-LOOP-2026-0250/T01), read from `wu.last_gate_results`. Empty when
+    verify was stubbed or never reached."""
+    events = []
+    for gr in (getattr(wu, "last_gate_results", None) or []):
+        events.append(build_event("gate_result", wu.wu_id, {
+            "attempt": attempt,
+            "gate": gr["name"],
+            "ok": bool(gr["ok"]),
+            "skipped": bool(gr.get("skipped", False)),
+            "duration_seconds": gr.get("duration_seconds", 0),
+            "phase": "attempt",
+        }))
+    return events
 
 
 def execute_unit_attempt(
@@ -12399,11 +12428,13 @@ def run(
                         reason = failure_note.strip().splitlines()[0][:200]
                         print(f"   retry reason: {reason}")
                     t0 = time.monotonic()
+                    wu.last_gate_results = []
                     outcome, payload, usage = execute_unit_attempt(
                         wu, feature_dir, failure_note, cost_tracking=cost_tracking,
                         head_before=head_before, prerun_cfg=cfg,
                         gate_file=gate.file,
                     )
+                    wu_events.extend(build_attempt_gate_events(wu, attempt))
                     duration = round(time.monotonic() - t0, 3)
                     attempt_record: dict = {"attempt": attempt,
                                             "duration_seconds": duration}

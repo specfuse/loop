@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0250/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 4.00
 produces:
@@ -13,10 +13,13 @@ produces_driver_helper:
   - _run_gate_set
 model: sonnet
 effort: medium
-duration_seconds: 291.222
-cost_usd: 0.410784
-input_tokens: 26
-output_tokens: 9911
+duration_seconds: 67.084
+cost_usd: 0.384186
+input_tokens: 28
+output_tokens: 8642
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-25T15:27:11.734142+00:00
 ---
 
 # T01 — walking skeleton: attempt-phase `gate_result` events

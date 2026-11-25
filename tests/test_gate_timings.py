@@ -1,0 +1,148 @@
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+"""FEAT-LOOP-2026-0250 gate 1 oracle — per-gate timings recorded as
+`gate_result` events. One class per Definition-of-done clause in GATE-01.md.
+T01 implements clause 1 and the schema half of clause 5; the rest are skipped
+naming their owning unit.
+"""
+
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from tests._loop_loader import load_loop
+
+loop = load_loop()
+
+SCHEMA = (Path(__file__).resolve().parent.parent
+          / "specfuse" / "loop" / "data" / "schemas" / "driver-event.schema.json")
+
+_BODY = (
+    "\n\n**Context.** test\n\n**Acceptance criteria.** test\n\n"
+    "**Do not touch.** test\n\n**Verification.** test\n\n"
+    "**Escalation triggers.** test\n"
+)
+SLEEP = 0.3
+
+
+class TestAttemptGateEvents(unittest.TestCase):
+    """Clause 1 — attempt phase."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.feature_dir = self.root / "feat"
+        self.feature_dir.mkdir()
+        self.wu_file = self.feature_dir / "WU-01.md"
+        self.wu_file.write_text(
+            "---\nid: FEAT-LOOP-2026-9999/T01\ntype: implementation\n"
+            f"model: sonnet\nstatus: pending\nattempts: 0\n---\n\n# T{_BODY}")
+        self.gate_file = self.feature_dir / "GATE-01.md"
+        self.gate_file.write_text(
+            "---\ngate: 1\nstatus: open\n"
+            f'feature_oracle: "sleep {SLEEP} && exit 0"\n---\n\n# Gate 1\n')
+        self.wu = loop.WorkUnit(
+            wu_id="FEAT-LOOP-2026-9999/T01", file=self.wu_file, depends_on=[],
+            type="implementation", model="sonnet", effort="medium",
+            status="pending", attempts=1, title="T", body="**Objective.** x")
+        self.cfg = {"code": [
+            {"name": "slow-pass", "command": f"sleep {SLEEP} && exit 0"},
+            {"name": "bad", "command": "exit 1"},
+            {"name": "dependent", "command": "exit 0", "needs": ["bad"]},
+        ]}
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _attempt(self):
+        def dispatch_fn(wu, note):
+            return "RESULT\nstatus: complete\n"
+
+        def verify_fn(wu, fd, gate_file=None):
+            return loop.verify(wu, fd, cfg=self.cfg, gate_file=gate_file)
+
+        loop_outcome = loop.execute_unit_attempt(
+            self.wu, self.feature_dir, None, dispatch_fn=dispatch_fn,
+            verify_fn=verify_fn, cost_tracking=False, prerun_cfg=self.cfg,
+            gate_file=self.gate_file)
+        return loop_outcome, loop.build_attempt_gate_events(self.wu, 1)
+
+    def test_one_gate_result_per_gate_with_payload(self):
+        (outcome, _p, _u), events = self._attempt()
+        self.assertEqual(outcome, "failed")
+        self.assertTrue(all(e["event_type"] == "gate_result" for e in events))
+        self.assertTrue(all(e["correlation_id"] == self.wu.wu_id for e in events))
+        by_gate = {e["payload"]["gate"]: e["payload"] for e in events}
+        self.assertEqual(
+            sorted(by_gate), ["bad", "dependent", "feature_oracle", "slow-pass"])
+        self.assertEqual(len(events), 4)
+        for payload in by_gate.values():
+            self.assertEqual(
+                set(payload),
+                {"attempt", "gate", "ok", "skipped", "duration_seconds", "phase"})
+            self.assertEqual(payload["attempt"], 1)
+            self.assertEqual(payload["phase"], "attempt")
+
+    def test_durations_and_skip_semantics(self):
+        _, events = self._attempt()
+        by_gate = {e["payload"]["gate"]: e["payload"] for e in events}
+        for name in ("slow-pass", "feature_oracle"):
+            self.assertTrue(by_gate[name]["ok"])
+            self.assertFalse(by_gate[name]["skipped"])
+            self.assertGreaterEqual(by_gate[name]["duration_seconds"], SLEEP)
+        self.assertFalse(by_gate["bad"]["ok"])
+        self.assertFalse(by_gate["bad"]["skipped"])
+        self.assertGreater(by_gate["bad"]["duration_seconds"], 0)
+        dep = by_gate["dependent"]
+        self.assertFalse(dep["ok"])
+        self.assertTrue(dep["skipped"])
+        self.assertEqual(dep["duration_seconds"], 0)
+
+    def test_stub_verify_without_gate_results_emits_none(self):
+        self.wu.last_gate_results = []
+        self.assertEqual(loop.build_attempt_gate_events(self.wu, 1), [])
+
+
+class TestAttemptSplit(unittest.TestCase):
+    """Clause 2 — owned by T02."""
+
+    @unittest.skip("T02 owns the agent_seconds/verify_seconds split")
+    def test_split(self):
+        pass
+
+
+class TestBaselineAndBroadPhases(unittest.TestCase):
+    """Clause 3 — owned by T03."""
+
+    @unittest.skip("T03 owns baseline and broad phase gate_result events")
+    def test_phases(self):
+        pass
+
+
+class TestStatsReport(unittest.TestCase):
+    """Clause 4 — owned by T04."""
+
+    @unittest.skip("T04 owns the specfuse stats report")
+    def test_stats(self):
+        pass
+
+
+class TestNothingExistingChanges(unittest.TestCase):
+    """Clause 5 — T01 owns the schema half; T02-T04 own the rest."""
+
+    def test_gate_result_in_schema_event_types(self):
+        schema = json.loads(SCHEMA.read_text())
+        self.assertIn("gate_result", schema["event_types"])
+
+    @unittest.skip("T04 owns the every-emitted-event-validates half")
+    def test_emitted_events_validate(self):
+        pass
+
+
+if __name__ == "__main__":
+    unittest.main()

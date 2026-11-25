@@ -1,0 +1,2 @@
+- **FEAT-LOOP-2026-0250/T01**: _run_gate_set times each spawned gate (duration_seconds, skipped gates get skipped:True and duration_seconds:0). verify() stores the per-gate results on wu.last_gate_results, and run() emits one attempt-phase gate_result per gate via build_attempt_gate_events. The schema now lists gate_result.
+  - note: Side channel is WorkUnit.last_gate_results, reset before each attempt, so the verify_fn signature is unchanged. Reuse build_event("gate_result", ...) with phase baseline or broad for T03.
