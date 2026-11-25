@@ -238,9 +238,70 @@ class TestBaselineAndBroadPhases(unittest.TestCase):
 class TestStatsReport(unittest.TestCase):
     """Clause 4 — owned by T04."""
 
-    @unittest.skip("T04 owns the specfuse stats report")
-    def test_stats(self):
-        pass
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write(self, name, events):
+        d = self.root / ".specfuse" / "features" / name
+        d.mkdir(parents=True)
+        (d / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in events) + "\n")
+
+    @staticmethod
+    def _attempt(ts, n, **extra):
+        payload = {"attempt": n, "outcome": "passed", "cost_usd": 1.0,
+                   "duration_seconds": 10.0}
+        payload.update(extra)
+        return {"timestamp": ts, "correlation_id": "FEAT-LOOP-2026-9999/T01",
+                "event_type": "attempt_outcome", "payload": payload}
+
+    @staticmethod
+    def _gate(ts, gate, secs, phase="attempt", attempt=1):
+        return {"timestamp": ts, "correlation_id": "FEAT-LOOP-2026-9999/T01",
+                "event_type": "gate_result",
+                "payload": {"attempt": attempt, "gate": gate, "ok": True,
+                            "skipped": False, "duration_seconds": secs,
+                            "phase": phase}}
+
+    def test_new_corpus_reports_split_and_gates(self):
+        from specfuse.loop import events_stats
+        self._write("FEAT-LOOP-2026-9999-x", [
+            self._attempt("t1", 1, agent_seconds=6.0, verify_seconds=2.0),
+            self._attempt("t2", 2, agent_seconds=2.0, verify_seconds=2.0),
+            self._gate("t1", "tests", 4.0), self._gate("t1", "lint", 1.0),
+            self._gate("t2", "tests", 2.0, attempt=2),
+            self._gate("t3", "tests", 9.0, phase="broad"),
+        ])
+        stats = events_stats.collect([self.root])
+        split = next(iter(stats["time_split"].values()))
+        self.assertEqual(split["agent_seconds"], 8.0)
+        self.assertEqual(split["verify_seconds"], 4.0)
+        self.assertAlmostEqual(split["agent_share"], 0.6667, places=4)
+        rows = {(r["phase"], r["gate"]): r for r in stats["gate_timings"]}
+        t = rows[("attempt", "tests")]
+        self.assertEqual((t["runs"], t["total_seconds"], t["median_seconds"],
+                          t["max_seconds"]), (2, 6.0, 3.0, 4.0))
+        self.assertEqual(rows[("broad", "tests")]["total_seconds"], 9.0)
+        # ordered by total seconds, descending
+        totals = [r["total_seconds"] for r in stats["gate_timings"]]
+        self.assertEqual(totals, sorted(totals, reverse=True))
+        text = events_stats.render(stats)
+        self.assertNotIn("not recorded", text)
+        self.assertIn("slowest gates", text)
+        json.dumps(stats)
+
+    def test_old_corpus_reads_not_recorded(self):
+        from specfuse.loop import events_stats
+        self._write("FEAT-LOOP-2026-8888-old", [self._attempt("t1", 1)])
+        stats = events_stats.collect([self.root])
+        self.assertEqual(stats["time_split"], {})
+        self.assertEqual(stats["gate_timings"], [])
+        text = events_stats.render(stats)
+        self.assertEqual(text.count("not recorded"), 2)
 
 
 class TestNothingExistingChanges(unittest.TestCase):
@@ -250,9 +311,27 @@ class TestNothingExistingChanges(unittest.TestCase):
         schema = json.loads(SCHEMA.read_text())
         self.assertIn("gate_result", schema["event_types"])
 
-    @unittest.skip("T04 owns the every-emitted-event-validates half")
     def test_emitted_events_validate(self):
-        pass
+        from specfuse.loop import validate_event
+        validator = validate_event.load_validator()
+        wu = loop.WorkUnit(
+            wu_id="FEAT-LOOP-2026-9999/T01", file=Path("WU-01.md"),
+            depends_on=[], type="implementation", model="sonnet",
+            effort="medium", status="pending", attempts=1, title="T",
+            body="x")
+        wu.last_gate_results = [
+            {"name": "g", "ok": True, "skipped": False, "duration_seconds": 0.5},
+            {"name": "h", "ok": False, "skipped": True, "duration_seconds": 0}]
+        events = loop.build_attempt_gate_events(wu, 1)
+        events.append(loop.emit_attempt_outcome(
+            wu, 1, "passed", {"agent_seconds": 1.0, "verify_seconds": 0.5,
+                              "duration_seconds": 2.0}))
+        loop._PHASE_GATE_RESULTS["broad"] = list(wu.last_gate_results)
+        events += loop.build_phase_gate_events("broad", "FEAT-LOOP-2026-9999")
+        for e in events:
+            self.assertEqual(
+                validate_event.validate_line(
+                    validator, "t", 0, json.dumps(e)), [], e["event_type"])
 
 
 if __name__ == "__main__":

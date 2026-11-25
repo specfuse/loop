@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0250/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 produces:
@@ -11,6 +11,13 @@ produces:
   - tests/test_gate_timings.py
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-25T15:30:51.265035+00:00
+duration_seconds: 54.107
+cost_usd: 0.292464
+input_tokens: 18
+output_tokens: 6820
 ---
 
 # T04 — `specfuse stats` reports the split and the slowest gates; docs

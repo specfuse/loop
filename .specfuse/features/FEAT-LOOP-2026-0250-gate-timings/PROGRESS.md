@@ -2,3 +2,4 @@
   - note: Side channel is WorkUnit.last_gate_results, reset before each attempt, so the verify_fn signature is unchanged. Reuse build_event("gate_result", ...) with phase baseline or broad for T03.
 - **FEAT-LOOP-2026-0250/T02**: attempt 1 outcome=passed
 - **FEAT-LOOP-2026-0250/T03**: Added gate_result events for fresh baseline probes (phase "baseline") and fresh broad runs (phase "broad"), both with attempt null. Tree-unchanged skips emit none. TestBaselineAndBroadPhases now has real tests and they pass; the narrow tier passes.
+- **FEAT-LOOP-2026-0250/T04**: attempt 1 outcome=passed
