@@ -5,7 +5,7 @@ slug: gate-timings
 branch: feat/FEAT-LOOP-2026-0250-gate-timings
 roadmap_goal: An operator who finds the loop slow can read from `specfuse stats` how much attempt time went to the agent versus the verification gates, and which gates cost the most.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 18.50
 ---
 

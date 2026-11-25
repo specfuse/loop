@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 feature_oracle: "python3 -m unittest tests.test_gate_timings -v -b"
 cost_budget_usd: 22.00
 baseline:

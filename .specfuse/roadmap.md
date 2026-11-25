@@ -128,7 +128,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0247) |
 | FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
 | FEAT-LOOP-2026-0249 | Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0249) |
-| FEAT-LOOP-2026-0250 | Record verification gate results and durations | active | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ detail](#feat-loop-2026-0250) |
+| FEAT-LOOP-2026-0250 | Record verification gate results and durations | done | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ archive](roadmap-archive.md#feat-loop-2026-0250) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1058,17 +1058,6 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
 
 **Status: planned.**
-
-<a id="feat-loop-2026-0250"></a>
-## FEAT-LOOP-2026-0250 — Record verification gate results and durations
-
-**Why.** `attempt_outcome.duration_seconds` is one timer around the agent session and every verification gate together, and no event records which gates ran, how long each took, or which passed. An operator report measured 184 attempts, about 17.5 hours of attempt time, with no way to say how much was the agent and how much the gates, so every optimisation (smaller units, model or effort, a faster gate, parallel gates) is a guess.
-
-**Goal.** One `gate_result` event per gate per run (attempt, baseline probe, broad run) with its outcome and duration; `agent_seconds` and `verify_seconds` on `attempt_outcome`; `specfuse stats` reports the agent/verify split per feature and the slowest gates, and says "not recorded" on older logs. One gate, four units and a terminal close.
-
-**Out of scope.** A live progress view or halt notification, parallel gates or a result cache, backfilling old logs, persisting events from killed attempts.
-
-**Status: active.**
 
 ## Notes
 
