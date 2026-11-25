@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0250/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 produces:
@@ -13,6 +13,13 @@ produces_driver_helper:
   - emit_attempt_outcome
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-25T15:28:19.062339+00:00
+duration_seconds: 79.802
+cost_usd: 0.335182
+input_tokens: 34
+output_tokens: 7052
 ---
 
 # T02 — `agent_seconds` and `verify_seconds` on `attempt_outcome`

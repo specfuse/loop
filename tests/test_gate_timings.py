@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -109,11 +110,67 @@ class TestAttemptGateEvents(unittest.TestCase):
 
 
 class TestAttemptSplit(unittest.TestCase):
-    """Clause 2 — owned by T02."""
+    """Clause 2 — agent_seconds / verify_seconds on attempt_outcome."""
 
-    @unittest.skip("T02 owns the agent_seconds/verify_seconds split")
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.feature_dir = self.root / "feat"
+        self.feature_dir.mkdir()
+        wu_file = self.feature_dir / "WU-01.md"
+        wu_file.write_text(
+            "---\nid: FEAT-LOOP-2026-9999/T01\ntype: implementation\n"
+            f"model: sonnet\nstatus: pending\nattempts: 0\n---\n\n# T{_BODY}")
+        self.gate_file = self.feature_dir / "GATE-01.md"
+        self.gate_file.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+        self.wu = loop.WorkUnit(
+            wu_id="FEAT-LOOP-2026-9999/T01", file=wu_file, depends_on=[],
+            type="implementation", model="sonnet", effort="medium",
+            status="pending", attempts=1, title="T", body="**Objective.** x")
+        self.cfg = {"code": [
+            {"name": "slow-pass", "command": f"sleep {SLEEP} && exit 0"}]}
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _run(self, stdout):
+        def dispatch_fn(wu, note):
+            time.sleep(SLEEP)
+            return stdout
+
+        def verify_fn(wu, fd, gate_file=None):
+            return loop.verify(wu, fd, cfg=self.cfg, gate_file=gate_file)
+
+        t0 = time.monotonic()
+        outcome, _p, usage = loop.execute_unit_attempt(
+            self.wu, self.feature_dir, None, dispatch_fn=dispatch_fn,
+            verify_fn=verify_fn, cost_tracking=False, prerun_cfg=self.cfg,
+            gate_file=self.gate_file)
+        duration = time.monotonic() - t0
+        usage = dict(usage)
+        usage["duration_seconds"] = duration
+        event = loop.emit_attempt_outcome(self.wu, 1, outcome, usage)
+        return outcome, event["payload"]
+
     def test_split(self):
-        pass
+        _, payload = self._run("RESULT\nstatus: complete\n")
+        self.assertGreaterEqual(payload["agent_seconds"], SLEEP)
+        self.assertGreaterEqual(payload["verify_seconds"], SLEEP)
+        self.assertLessEqual(
+            payload["agent_seconds"] + payload["verify_seconds"],
+            payload["duration_seconds"])
+
+    def test_blocked_records_zero_verify(self):
+        outcome, payload = self._run(
+            "```result\nstatus: blocked\nblocked_reason: nope\n```\n")
+        self.assertEqual(outcome, "blocked")
+        self.assertEqual(payload["verify_seconds"], 0)
+        self.assertGreaterEqual(payload["agent_seconds"], SLEEP)
+
+    def test_defaults_when_usage_lacks_keys(self):
+        payload = loop.emit_attempt_outcome(self.wu, 1, "failed", {})["payload"]
+        self.assertEqual(payload["agent_seconds"], 0.0)
+        self.assertEqual(payload["verify_seconds"], 0.0)
 
 
 class TestBaselineAndBroadPhases(unittest.TestCase):

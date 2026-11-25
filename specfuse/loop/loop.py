@@ -2940,6 +2940,8 @@ def emit_attempt_outcome(
         "attempt": attempt,
         "outcome": outcome,
         "duration_seconds": usage.get("duration_seconds", 0.0),
+        "agent_seconds": usage.get("agent_seconds", 0.0),
+        "verify_seconds": usage.get("verify_seconds", 0.0),
         "cost_usd": usage.get("cost_usd", 0.0),
         "input_tokens": usage.get("input_tokens", 0),
         "output_tokens": usage.get("output_tokens", 0),
@@ -8433,14 +8435,22 @@ def execute_unit_attempt(
     worklist_section = format_reverification_worklist(wu, feature_dir)
     if worklist_section:
         wu.body = wu.body + "\n\n" + worklist_section
+    _agent_t0 = time.monotonic()
     if dispatch_fn is None:
         result = dispatch(wu, failure_note, cost_tracking)
     else:
         result = dispatch_fn(wu, failure_note)
+    agent_seconds = time.monotonic() - _agent_t0
     if isinstance(result, tuple):
         stdout, usage = result
     else:
         stdout, usage = result, None
+    # FEAT-LOOP-2026-0250/T02: split the attempt's time into agent session and
+    # verification. Always a fresh dict so a stub's own usage is never mutated;
+    # a plain-string stub (usage None) still gets the timing keys.
+    usage = dict(usage) if usage else {}
+    usage["agent_seconds"] = agent_seconds
+    usage["verify_seconds"] = 0
     # Zero-token guard runs BEFORE RESULT-block parsing: the agent did not
     # produce output, so any block in stdout is hallucinated upstream and
     # must not be trusted (FEAT-2026-0008/T01). Opt-in via cost tracking —
@@ -8455,10 +8465,14 @@ def execute_unit_attempt(
         # deciding whether to insert a fix unit instead of escalating.
         wu.result_block = parse_result_block(stdout or "")
         return "blocked", reason, usage
-    if _accepts_gate_file(verify_fn):
-        passed, evidence = verify_fn(wu, feature_dir, gate_file=gate_file)
-    else:
-        passed, evidence = verify_fn(wu, feature_dir)
+    _verify_t0 = time.monotonic()
+    try:
+        if _accepts_gate_file(verify_fn):
+            passed, evidence = verify_fn(wu, feature_dir, gate_file=gate_file)
+        else:
+            passed, evidence = verify_fn(wu, feature_dir)
+    finally:
+        usage["verify_seconds"] = time.monotonic() - _verify_t0
     if not passed:
         return "failed", evidence, usage
     # files_changed guard (FEAT-2026-0008/T02): the agent's RESULT claim
