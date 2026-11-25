@@ -128,7 +128,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0247) |
 | FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
 | FEAT-LOOP-2026-0249 | Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0249) |
-| FEAT-LOOP-2026-0250 | Record verification gate results and durations | planned | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ detail](#feat-loop-2026-0250) |
+| FEAT-LOOP-2026-0250 | Record verification gate results and durations | active | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ detail](#feat-loop-2026-0250) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1067,7 +1067,7 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Out of scope.** A live progress view or halt notification, parallel gates or a result cache, backfilling old logs, persisting events from killed attempts.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
