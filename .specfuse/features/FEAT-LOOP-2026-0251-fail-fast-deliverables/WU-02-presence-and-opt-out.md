@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 produces:
@@ -14,6 +14,13 @@ produces_driver_helper:
   - execute_unit_attempt
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-25T23:27:13.111963+00:00
+duration_seconds: 319.321
+cost_usd: 0.771194
+input_tokens: 40
+output_tokens: 19169
 ---
 
 # T02 — presence refusals early, and the `fail_fast_deliverables` opt-out

@@ -648,6 +648,19 @@ def resolve_retain_on_guard_refusal(verification_cfg: dict) -> bool:
     return bool(project.get("retain_on_guard_refusal", True))
 
 
+def resolve_fail_fast_deliverables(verification_cfg: dict) -> bool:
+    """Whether the diff-only deliverable refusals run before verification
+    (FEAT-LOOP-2026-0251/T02).
+
+    Reads `defaults.fail_fast_deliverables` from verification.yml. Defaults to
+    True. False is for a project whose gates write a declared deliverable:
+    `deliverable_missing`, `no_deliverable_files` and `produces_not_in_diff`
+    then run only after verification.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    return bool(project.get("fail_fast_deliverables", True))
+
+
 def resolve_dispatch_skills(verification_cfg: dict) -> bool:
     """Whether a dispatched session gets the project's skills index (#3423).
 
@@ -8598,13 +8611,13 @@ def execute_unit_attempt(
         return "blocked", reason, usage
     # Fail fast (FEAT-LOOP-2026-0251/T01): a refusal that judges only the
     # attempt's diff must not first pay for a verification run.
-    if head_before is not None:
+    if head_before is not None and resolve_fail_fast_deliverables(cfg):
         early_block = parse_result_block(stdout or "")
         refusal = early_produces_refusal(
             wu, head_before, untracked_before, early_block, cfg)
         if refusal is not None:
             wu.result_block = early_block
-            return "produces_not_in_diff", refusal, usage
+            return refusal["outcome"], refusal, usage
     _verify_t0 = time.monotonic()
     try:
         if _accepts_gate_file(verify_fn):
@@ -11661,21 +11674,89 @@ def early_produces_refusal(
     untracked_before: "set[str] | frozenset[str]",
     result_block: "dict | None", cfg: dict,
 ) -> "dict | None":
-    """The `produces_not_in_diff` refusal decidable before verification, as
-    ``{"remaining", "touched"}``; None when verification should run.
+    """The deliverable refusal decidable before verification; None when
+    verification should run.
 
-    Stays silent when the presence or empty-files guard would refuse: those
-    run first after the squash and keep their own outcome.
+    Checks in the post-squash guards' order, so the same one wins:
+    ``{"outcome": "deliverable_missing", "summary"}``,
+    ``{"outcome": "no_deliverable_files", "summary"}``, or
+    ``{"outcome": "produces_not_in_diff", "remaining", "touched"}``.
+    The last two stay silent when git cannot name the pending diff.
     """
-    if not wu.produces or not assert_declared_deliverables(wu)[0]:
-        return None
+    present, summary = assert_declared_deliverables(wu)
+    if not present:
+        return {"outcome": "deliverable_missing", "summary": summary}
     touched = pending_squash_names(head_before, untracked_before)
-    if touched is None or not assert_implementation_touched_files(wu, touched)[0]:
+    if touched is None:
+        return None
+    touched_ok, summary = assert_implementation_touched_files(wu, touched)
+    if not touched_ok:
+        return {"outcome": "no_deliverable_files", "summary": summary}
+    if not wu.produces:
         return None
     remaining = decide_produces_in_diff(wu, touched, result_block, cfg)[0]
     if not remaining:
         return None
-    return {"remaining": remaining, "touched": touched}
+    return {"outcome": "produces_not_in_diff", "remaining": remaining,
+            "touched": touched}
+
+
+_NOT_VERIFIED_NOTE = (
+    "\n\nRefused before the verification gates: verification did not run.")
+
+
+def refuse_deliverable_missing(
+    wu: WorkUnit, attempt: int, usage: dict, summary: str,
+    touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
+    untracked_before, verification_ran: bool,
+) -> "tuple[str, dict]":
+    """Settle the tree and build the record of a `deliverable_missing`
+    refusal for either call site. Returns ``(note, event)``."""
+    # Composed BEFORE the reset. The reset rolls the attempt back, so
+    # afterwards every declared path reads ABSENT and the note would lose the
+    # one distinction it exists to record — which of the declared
+    # deliverables the attempt did land (#1412).
+    note = format_deliverable_missing_note(wu, summary, touched, attempt)
+    if not verification_ran:
+        note += _NOT_VERIFIED_NOTE
+    note, retained = _resolve_guard_refusal_tree(
+        cfg, head_before, events_path, untracked_before, note,
+        failure_class="guard_refusal", verification_ran=verification_ran,
+    )
+    event = emit_attempt_outcome(
+        wu, attempt, "deliverable_missing", usage,
+        failure_class="guard_refusal",
+        failure_signature="assert_declared_deliverables",
+        failure_excerpt=extract_failure_excerpt(summary),
+        files_touched=touched,
+        extras={"summary": summary,
+                "missing": summary.split(": ", 1)[-1],
+                "tree_retained": retained},
+    )
+    return note, event
+
+
+def refuse_no_deliverable_files(
+    wu: WorkUnit, attempt: int, usage: dict, summary: str,
+    touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
+    untracked_before, verification_ran: bool,
+) -> "tuple[str, dict]":
+    """Settle the tree and build the record of a `no_deliverable_files`
+    refusal for either call site. Returns ``(note, event)``."""
+    note = summary if verification_ran else summary + _NOT_VERIFIED_NOTE
+    note, retained = _resolve_guard_refusal_tree(
+        cfg, head_before, events_path, untracked_before, note,
+        failure_class="guard_refusal", verification_ran=verification_ran,
+    )
+    event = emit_attempt_outcome(
+        wu, attempt, "no_deliverable_files", usage,
+        failure_class="guard_refusal",
+        failure_signature="assert_implementation_touched_files",
+        failure_excerpt=extract_failure_excerpt(summary),
+        files_touched=touched,
+        extras={"summary": summary, "tree_retained": retained},
+    )
+    return note, event
 
 
 def refuse_produces_not_in_diff(
@@ -11687,8 +11768,7 @@ def refuse_produces_not_in_diff(
     refusal for either call site. Returns ``(summary, note, event)``."""
     summary, note, signature = format_produces_refusal(remaining)
     if not verification_ran:
-        note += ("\n\nRefused before the verification gates: verification "
-                 "did not run.")
+        note += _NOT_VERIFIED_NOTE
     excerpt = extract_failure_excerpt(note)
     note, retained = _resolve_guard_refusal_tree(
         cfg, head_before, events_path, untracked_before, note,
@@ -13036,6 +13116,36 @@ def run(
                         )
                         continue
 
+                    if outcome in ("no_deliverable_files",
+                                   "deliverable_missing"):
+                        # Refused before verify() (FEAT-LOOP-2026-0251/T02).
+                        _refuse = (
+                            refuse_deliverable_missing
+                            if outcome == "deliverable_missing"
+                            else refuse_no_deliverable_files)
+                        _early_note, _early_event = _refuse(
+                            wu, attempt, attempts_usage[-1],
+                            payload["summary"], _refusal_touched,
+                            cfg=cfg, head_before=head_before,
+                            events_path=events_path,
+                            untracked_before=untracked_before,
+                            verification_ran=False,
+                        )
+                        wu_events.append(_early_event)
+                        # `+=` for the reason given at the late
+                        # `produces_not_in_diff` site: the `.append(` count
+                        # tracks one late site per guard.
+                        refusal_history += [
+                            (payload["summary"], _refusal_touched)]
+                        attempt_notes.append((attempt, _early_note))
+                        failure_note = _early_note
+                        print(
+                            f"   {outcome.replace('_', ' ').upper()} attempt "
+                            f"{attempt}/{wu_max_attempts} — "
+                            f"{payload['summary']}"
+                        )
+                        continue
+
                     if outcome == "passed":
                         # Flip status to DONE BEFORE the squash so the flip is
                         # included in the commit content — survives the next WU's
@@ -13192,32 +13302,16 @@ def run(
                         # every current WU is unchanged.
                         deliv_ok, deliv_summary = assert_declared_deliverables(wu)
                         if not deliv_ok:
-                            # Composed BEFORE the reset. The reset rolls the
-                            # squash back, so afterwards every declared path
-                            # reads ABSENT and the note would lose the one
-                            # distinction it exists to record — which of the
-                            # declared deliverables the attempt did land (#1412).
-                            _deliv_note = format_deliverable_missing_note(
-                                wu, deliv_summary, _refusal_touched, attempt,
-                            )
-                            _deliv_note, _deliv_retained = (
-                                _resolve_guard_refusal_tree(
-                                    cfg, head_before, events_path,
-                                    untracked_before, _deliv_note,
-                                    failure_class="guard_refusal",
+                            _deliv_note, _deliv_event = (
+                                refuse_deliverable_missing(
+                                    wu, attempt, attempts_usage[-1],
+                                    deliv_summary, _refusal_touched,
+                                    cfg=cfg, head_before=head_before,
+                                    events_path=events_path,
+                                    untracked_before=untracked_before,
+                                    verification_ran=True,
                                 ))
-                            missing = deliv_summary.split(": ", 1)[-1]
-                            wu_events.append(emit_attempt_outcome(
-                                wu, attempt, "deliverable_missing",
-                                attempts_usage[-1],
-                                failure_class="guard_refusal",
-                                failure_signature="assert_declared_deliverables",
-                                failure_excerpt=extract_failure_excerpt(deliv_summary),
-                                files_touched=_refusal_touched,
-                                extras={"summary": deliv_summary,
-                                        "missing": missing,
-                                        "tree_retained": _deliv_retained},
-                            ))
+                            wu_events.append(_deliv_event)
                             refusal_history.append(
                                 (deliv_summary, _refusal_touched))
                             attempt_notes.append((attempt, _deliv_note))
@@ -13245,22 +13339,16 @@ def run(
                             wu, touched,
                         )
                         if not impl_ok:
-                            _impl_note, _impl_retained = (
-                                _resolve_guard_refusal_tree(
-                                    cfg, head_before, events_path,
-                                    untracked_before, impl_summary,
-                                    failure_class="guard_refusal",
+                            _impl_note, _impl_event = (
+                                refuse_no_deliverable_files(
+                                    wu, attempt, attempts_usage[-1],
+                                    impl_summary, _refusal_touched,
+                                    cfg=cfg, head_before=head_before,
+                                    events_path=events_path,
+                                    untracked_before=untracked_before,
+                                    verification_ran=True,
                                 ))
-                            wu_events.append(emit_attempt_outcome(
-                                wu, attempt, "no_deliverable_files",
-                                attempts_usage[-1],
-                                failure_class="guard_refusal",
-                                failure_signature="assert_implementation_touched_files",
-                                failure_excerpt=extract_failure_excerpt(impl_summary),
-                                files_touched=_refusal_touched,
-                                extras={"summary": impl_summary,
-                                        "tree_retained": _impl_retained},
-                            ))
+                            wu_events.append(_impl_event)
                             refusal_history.append(
                                 (impl_summary, _refusal_touched))
                             attempt_notes.append((attempt, _impl_note))

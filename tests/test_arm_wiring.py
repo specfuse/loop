@@ -27,7 +27,7 @@ from specfuse.loop.arm_eval import ArmDecision, ClassVerdict
 from specfuse.loop.plan_baseline import load_plan_graph, write_baseline_if_absent
 
 from tests._loop_loader import load_loop
-from tests._workspace import integration_workspace
+from tests._workspace import integration_workspace, with_deliverable
 
 loop = load_loop()
 
@@ -391,7 +391,7 @@ class TestAutoArm(unittest.TestCase):
             def fake_dispatch(wu, failure_note, cost_tracking=True):
                 return "```result\nstatus: complete\n```\n"
 
-            self._patch("dispatch", fake_dispatch)
+            self._patch("dispatch", with_deliverable(fake_dispatch))
             self._patch("verify", lambda wu, fd, cfg=None: (False, "FAIL"))
             self._patch(
                 "probe_baseline",
@@ -430,7 +430,7 @@ class TestAutoArm(unittest.TestCase):
             def fake_dispatch(wu, failure_note, cost_tracking=True):
                 return "```result\nstatus: complete\n```\n"
 
-            self._patch("dispatch", fake_dispatch)
+            self._patch("dispatch", with_deliverable(fake_dispatch))
             self._patch("verify", lambda wu, fd, cfg=None: (False, "FAIL"))
             self._patch(
                 "probe_baseline",

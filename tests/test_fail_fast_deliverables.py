@@ -183,20 +183,134 @@ class TestProducesNotInDiffEarly(_Case):
             self.assertEqual(early[key], late[key], key)
 
 
-@unittest.skip("FEAT-LOOP-2026-0251/T02")
-class TestPresenceEarly(unittest.TestCase):
+def _delete_rule(fdir: Path) -> None:
+    Path("src/rule.py").unlink(missing_ok=True)
+
+
+def _empty_rule(fdir: Path) -> None:
+    Path("src/rule.py").write_text("")
+
+
+def _bookkeeping_only(fdir: Path) -> None:
+    for name in ("WU-T01.md", "events.jsonl"):
+        with (fdir / name).open("a") as handle:
+            handle.write("\n")
+
+
+def _notes_only(fdir: Path) -> None:
+    Path("docs").mkdir(exist_ok=True)
+    Path("docs/notes.md").write_text("notes\n")
+
+
+class TestPresenceEarly(_Case):
     """Clause 2 — `deliverable_missing` / `no_deliverable_files` early."""
 
-    def test_pending(self):
-        self.fail("T02")
+    def _assert_early(self, act, expected: str):
+        _, fdir = self._workspace()
+        wu = loop.load_wu(fdir, {"id": T01, "file": "WU-T01.md",
+                                 "depends_on": []})
+        head = _git("rev-parse", "HEAD")
+        calls = []
+
+        def dispatch_fn(w, note):
+            act(fdir)
+            return _COMPLETE
+
+        def verify_fn(w, fd):
+            calls.append(w.wu_id)
+            return True, "(stub)"
+
+        outcome, payload, usage = loop.execute_unit_attempt(
+            wu, fdir, None, dispatch_fn=dispatch_fn, verify_fn=verify_fn,
+            cost_tracking=False, head_before=head, prerun_cfg={},
+            untracked_before=loop.untracked_paths())
+        self.assertEqual(outcome, expected)
+        self.assertTrue(payload["summary"])
+        self.assertEqual(calls, [])
+        self.assertEqual(usage["verify_seconds"], 0)
+
+    def test_absent_path_is_refused_without_verifying(self):
+        self._assert_early(_delete_rule, "deliverable_missing")
+
+    def test_empty_path_is_refused_without_verifying(self):
+        self._assert_early(_empty_rule, "deliverable_missing")
+
+    def test_bookkeeping_only_diff_is_refused_without_verifying(self):
+        self._assert_early(_bookkeeping_only, "no_deliverable_files")
 
 
-@unittest.skip("FEAT-LOOP-2026-0251/T02")
-class TestOptOut(unittest.TestCase):
+class TestOptOut(_Case):
     """Clause 3 — `defaults.fail_fast_deliverables: false`."""
 
-    def test_pending(self):
-        self.fail("T02")
+    _REFUSALS = ("deliverable_missing", "no_deliverable_files",
+                 "produces_not_in_diff")
+
+    def test_key_defaults_to_true(self):
+        self.assertTrue(loop.resolve_fail_fast_deliverables({}))
+        self.assertFalse(loop.resolve_fail_fast_deliverables(
+            {"defaults": {"fail_fast_deliverables": False}}))
+
+    def _first_refusal(self, act, fail_fast: bool):
+        """`loop.run()`; returns the first refusal record and how many times
+        the unit was verified before the second dispatch."""
+        _, fdir = self._workspace()
+        seen = []
+        load = loop.load_verification
+
+        def load_cfg(*args, **kwargs):
+            cfg = dict(load(*args, **kwargs))
+            if not fail_fast:
+                cfg["defaults"] = {"fail_fast_deliverables": False}
+            return cfg
+
+        def dispatch(wu, note, ct=True):
+            if wu.wu_id == T01:
+                seen.append("dispatch")
+                act(fdir)
+            return _COMPLETE
+
+        def verify(wu, fd, cfg=None):
+            if wu.wu_id == T01:
+                seen.append("verify")
+            return True, "(stub)"
+
+        self._patch("load_verification", load_cfg)
+        self._patch("dispatch", dispatch)
+        self._patch("verify", verify)
+        self.assertEqual(loop.run(None, dry_run=False), 1)
+        for name, original in reversed(self._patches):
+            setattr(loop, name, original)
+        self._patches.clear()
+        refusals = [
+            e["payload"] for e in map(
+                json.loads,
+                filter(None, (fdir / "events.jsonl").read_text().splitlines()))
+            if e["event_type"] == "attempt_outcome"
+            and e["payload"]["outcome"] in self._REFUSALS]
+        self.assertTrue(refusals)
+        first_attempt = seen[1:]
+        if "dispatch" in first_attempt:
+            first_attempt = first_attempt[:first_attempt.index("dispatch")]
+        return refusals[0], first_attempt.count("verify")
+
+    def _assert_opt_out(self, act, expected: str):
+        default, default_verified = self._first_refusal(act, fail_fast=True)
+        late, late_verified = self._first_refusal(act, fail_fast=False)
+        self.assertEqual(default_verified, 0)
+        self.assertEqual(late_verified, 1)
+        self.assertEqual(late["outcome"], expected)
+        for key in ("outcome", "failure_class", "failure_signature",
+                    "summary"):
+            self.assertEqual(default[key], late[key], key)
+
+    def test_deliverable_missing_verifies_first(self):
+        self._assert_opt_out(_delete_rule, "deliverable_missing")
+
+    def test_no_deliverable_files_verifies_first(self):
+        self._assert_opt_out(_bookkeeping_only, "no_deliverable_files")
+
+    def test_produces_not_in_diff_verifies_first(self):
+        self._assert_opt_out(_notes_only, "produces_not_in_diff")
 
 
 @unittest.skip("FEAT-LOOP-2026-0251/T03")

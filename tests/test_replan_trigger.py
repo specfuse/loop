@@ -183,6 +183,9 @@ class ReplanTerminatesTest(unittest.TestCase):
                     f"unit loop is spinning instead of terminating (a "
                     f"re-plan must spend the remaining attempt slot, not "
                     f"buy a new budget)")
+            # A deliverable, so each attempt reaches verify() rather than the
+            # early `no_deliverable_files` refusal.
+            Path("deliverable.txt").write_text(f"{dispatch_count['n']}\n")
             return "```result\nstatus: complete\n```\n"
 
         def fake_verify(wu, feature_dir, gate_file=None):

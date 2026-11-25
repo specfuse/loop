@@ -170,6 +170,9 @@ class TestGuardRefusalRetainsTree(unittest.TestCase):
 
             self._patch("dispatch", fake_dispatch)
             self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+            # The absent `src/extra.py` would otherwise be refused early as
+            # `deliverable_missing`, before the guard under test here.
+            self._patch("early_produces_refusal", lambda *a, **k: None)
 
             loop.run(None, dry_run=False)
 
