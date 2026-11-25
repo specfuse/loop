@@ -188,6 +188,49 @@ class TestRobustness(_Corpus):
         ])
         self.assertEqual(events_stats.collect([self.root])["totals"]["attempts"], 1)
 
+    def test_a_root_that_is_itself_a_repository_is_read(self):
+        """`specfuse stats` run inside a repository — its default `--roots .` —
+        must report on that repository, not refuse it as the wrong depth."""
+        repo = self.root / "repo"
+        self._feature("repo", "F", [
+            _ev("FEAT-2026-0001/T01", "2026-07-01T10:00:00Z", "passed", 1.0),
+            _ev("FEAT-2026-0001/T02", "2026-07-01T11:00:00Z", "passed", 2.0),
+        ])
+        stats = events_stats.collect([repo])
+        self.assertEqual(stats["totals"]["attempts"], 2)
+        self.assertEqual(stats["totals"]["repos"], 1)
+
+    def test_a_repository_reached_at_two_depths_is_counted_once(self):
+        """Passing a repository and its workspace together must not
+        double-count it, nor report it as two repositories."""
+        self._feature("repo", "F", [
+            _ev("FEAT-2026-0001/T01", "2026-07-01T10:00:00Z", "passed", 1.0),
+        ])
+        stats = events_stats.collect([self.root, self.root / "repo"])
+        self.assertEqual(stats["totals"]["attempts"], 1)
+        self.assertEqual(stats["totals"]["repos"], 1)
+
+    def test_default_roots_inside_a_repository_reports_it(self):
+        import contextlib
+        import io
+        import os
+        import sys
+        self._feature("repo", "F", [
+            _ev("FEAT-2026-0001/T01", "2026-07-01T10:00:00Z", "passed", 1.0),
+        ])
+        buf = io.StringIO()
+        argv, cwd = sys.argv, os.getcwd()
+        sys.argv = ["events_stats.py", "--json"]
+        os.chdir(self.root / "repo")
+        try:
+            with contextlib.redirect_stdout(buf):
+                rc = events_stats.main()
+        finally:
+            sys.argv = argv
+            os.chdir(cwd)
+        self.assertEqual(rc, 0, buf.getvalue())
+        self.assertEqual(json.loads(buf.getvalue())["totals"]["attempts"], 1)
+
     def test_empty_corpus_exits_nonzero_rather_than_printing_a_clean_report(self):
         import contextlib
         import io
