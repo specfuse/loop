@@ -1,11 +1,26 @@
 ---
 id: FEAT-LOOP-2026-0250/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
+judge_edit_acknowledged:
+  paths:
+    - produces_driver_helper
+    - specfuse/loop/data/schemas/driver-event.schema.json
+    - specfuse/loop/loop.py
+  reason: "All test are passing and we can continue"
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-11-25T17:03:20+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 0.0
+    prior_duration_seconds: 0.0
+    reason: "All test are passing and we can continue"
 model: sonnet
 effort: high
 ---
