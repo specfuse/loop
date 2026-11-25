@@ -1,8 +1,24 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_gate_timings -v -b"
 cost_budget_usd: 22.00
+baseline:
+  sha: 21191ae86fa93b0ae51ef939b522bd15b130ba6c
+  probed_at: 2026-11-25T15:20:21.670930+00:00
+  tree: 07bbf72d1e7af3c1a03af605f40e5563dc3a18db:0ec7c6da6e74f0b56753f09657b654a6d289b91b:12064a6191eeb830a9826d911a8543fbaba3da75:1fb7d45b824d49ab8dee91cfcfb29ac17ff37a8f:27968248a450a842ccd187b7dce0fb0ded934866:287efde8f90320baffac08f5f3287b9456a65cb9:2e29b2f7e073a0cbe290f01d3b397e1cdd10c81c:302816f6805b548990c2e47c2264d6c68679b21d:42796ea0e0a6c03811b0e4bc9dbd3b5ee62dd2e4:4acc6dfc5e8cece358c167d876515eba4a39a500:7d6f6c977308ee2b7fe76ffe4f86fda3c776ef38:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:91b2fa050120acfd6e3c5950af079ababcddb2a5:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d74b7d113b844e84f0009098f576fd28477f072d:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:fa2f4f88657587b6e3b560977858810846b1d366
+  entry_sha: 21191ae86fa93b0ae51ef939b522bd15b130ba6c
+  source: attributed:FEAT-LOOP-2026-0250/T01
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "(failures=2,"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
+    - gate: roadmap-link-gate
+      failure_class: other
+      failure_signature: "ERROR: roadmap.md:131: ref '#feat-loop-2026-0250' in roadmap…und in roadmap.md or roadmap-archive.md"
 ---
 
 # Gate 1 — per-gate timings are recorded, and `specfuse stats` reads them

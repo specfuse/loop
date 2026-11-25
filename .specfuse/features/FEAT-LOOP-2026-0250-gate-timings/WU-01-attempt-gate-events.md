@@ -13,6 +13,10 @@ produces_driver_helper:
   - _run_gate_set
 model: sonnet
 effort: medium
+duration_seconds: 291.222
+cost_usd: 0.410784
+input_tokens: 26
+output_tokens: 9911
 ---
 
 # T01 — walking skeleton: attempt-phase `gate_result` events
