@@ -16,9 +16,13 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
   docs-sync tests went red only in the gate's broad run. Run `scripts/sync-scaffold.sh` before
   reporting, and list the packaged copy in `produces:` so the diff guard sees it.
 
+  > **Accepted 2026-11-25** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0250/T04]`.
+
 - [FEAT-LOOP-2026-0250/T01] **A test that validates events through `validate_event` must pin the
   real packaged schemas and clear the validator's module caches.** `test_emitted_events_validate`
   passed alone and failed in the full suite because an earlier test left
   `_DRIVER_EVENT_TYPES_CACHE` empty, dropping every driver event type from the enum. Copy the
   pinning from `tests/test_event_gate_full_envelope.py` when writing the test, not after the broad
   run fails.
+
+  > **Accepted 2026-11-25** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-LOOP-2026-0250/T01]`.
