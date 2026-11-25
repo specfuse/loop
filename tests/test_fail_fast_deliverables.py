@@ -313,12 +313,99 @@ class TestOptOut(_Case):
         self._assert_opt_out(_notes_only, "produces_not_in_diff")
 
 
-@unittest.skip("FEAT-LOOP-2026-0251/T03")
-class TestTreeAndNote(unittest.TestCase):
+class TestTreeAndNote(_Case):
     """Clause 4 — tree handling and retry note."""
 
-    def test_pending(self):
-        self.fail("T03")
+    def _retry_note(self, act, retain: bool = True,
+                    fail_fast: bool = True):
+        """`loop.run()`; returns the note handed to the second T01 attempt and
+        whether the first attempt's work was still on disk at that point."""
+        self._workspace()
+        notes, kept = [], []
+        load = loop.load_verification
+
+        def load_cfg(*args, **kwargs):
+            cfg = dict(load(*args, **kwargs))
+            cfg["defaults"] = {"retain_on_guard_refusal": retain,
+                               "fail_fast_deliverables": fail_fast}
+            return cfg
+
+        def dispatch(wu, note, ct=True):
+            if wu.wu_id == T01:
+                notes.append(note)
+                if len(notes) == 1:
+                    act()
+                elif len(notes) == 2:
+                    kept.append(Path("docs/notes.md").exists())
+            return _COMPLETE
+
+        self._patch("load_verification", load_cfg)
+        self._patch("dispatch", dispatch)
+        self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+        self.assertEqual(loop.run(None, dry_run=False), 1)
+        for name, original in reversed(self._patches):
+            setattr(loop, name, original)
+        self._patches.clear()
+        self.assertGreaterEqual(len(notes), 2)
+        return notes[1], kept[0]
+
+    @staticmethod
+    def _two_files():
+        Path("docs").mkdir(exist_ok=True)
+        Path("docs/notes.md").write_text("notes\n")
+        Path("docs/other.md").write_text("other\n")
+
+    def _assert_note(self, note):
+        self.assertIn("src/rule.py", note)
+        self.assertIn("- `docs/notes.md`", note)
+        self.assertIn("- `docs/other.md`", note)
+        self.assertIn("verification did not run", note)
+        self.assertNotIn("verification already PASSED", note)
+
+    def test_retained_tree_and_note(self):
+        note, kept = self._retry_note(self._two_files, retain=True)
+        self._assert_note(note)
+        self.assertTrue(kept)
+
+    def test_reset_tree_and_note(self):
+        note, kept = self._retry_note(self._two_files, retain=False)
+        self._assert_note(note)
+        self.assertFalse(kept)
+
+    def test_attempt_that_changed_nothing_says_so(self):
+        note, _ = self._retry_note(lambda: None)
+        self.assertIn("this attempt changed no files", note)
+
+    def test_presence_refusals_list_changed_paths_early_and_late(self):
+        def delete_rule_and_write():
+            self._two_files()
+            Path("src/rule.py").unlink()
+
+        for fail_fast in (True, False):
+            with self.subTest("deliverable_missing", fail_fast=fail_fast):
+                note, _ = self._retry_note(delete_rule_and_write,
+                                           fail_fast=fail_fast)
+                self.assertIn("- `docs/notes.md`", note)
+                self.assertIn("- `docs/other.md`", note)
+            with self.subTest("no_deliverable_files", fail_fast=fail_fast):
+                note, _ = self._retry_note(lambda: None, fail_fast=fail_fast)
+                self.assertIn("this attempt changed no files", note)
+
+    def test_late_produces_refusal_lists_changed_paths(self):
+        note, _ = self._retry_note(self._two_files, fail_fast=False)
+        self.assertIn("- `docs/notes.md`", note)
+        self.assertIn("- `docs/other.md`", note)
+        self.assertNotIn("verification did not run", note)
+
+    def test_list_is_capped_at_twenty(self):
+        def thirty():
+            Path("docs").mkdir(exist_ok=True)
+            for i in range(30):
+                Path(f"docs/f{i:02}.md").write_text("x\n")
+
+        note, _ = self._retry_note(thirty, retain=False)
+        self.assertEqual(note.count("- `docs/f"), 20)
+        self.assertIn("and 10 more", note)
 
 
 @unittest.skip("FEAT-LOOP-2026-0251/T04")

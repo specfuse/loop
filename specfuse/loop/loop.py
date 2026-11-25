@@ -5211,8 +5211,34 @@ def persist_attempt_notes(
     return paths
 
 
+#: Most changed paths a guard-refusal retry note lists before counting the rest.
+CHANGED_PATHS_NOTE_CAP = 20
+
+
+def format_changed_paths(wu: "WorkUnit", changed: list) -> str:
+    """The retry-note listing of what a refused attempt changed
+    (FEAT-LOOP-2026-0251/T03).
+
+    *changed* is the diff the guard judged. The driver's own bookkeeping (the
+    unit's file, `events.jsonl`, the progress note) is left out, as
+    `assert_implementation_touched_files` leaves it out: the driver writes it
+    on every attempt, so listing it would hide that the agent changed nothing.
+    """
+    paths = [
+        t for t in changed
+        if Path(t).name not in (wu.file.name, "events.jsonl", PROGRESS_FILENAME)
+    ]
+    if not paths:
+        return "(none — this attempt changed no files)"
+    lines = [f"- `{p}`" for p in paths[:CHANGED_PATHS_NOTE_CAP]]
+    rest = len(paths) - CHANGED_PATHS_NOTE_CAP
+    if rest > 0:
+        lines.append(f"- … and {rest} more")
+    return "\n".join(lines)
+
+
 def format_deliverable_missing_note(
-    wu: "WorkUnit", summary: str, touched: list, attempt: int,
+    wu: "WorkUnit", summary: str, touched: "list | None", attempt: int,
 ) -> str:
     """Compose the attempt note for a deliverable-presence refusal (#1412).
 
@@ -5227,10 +5253,10 @@ def format_deliverable_missing_note(
 
     Renders what IS knowable at the refusal: every declared ``produces:``
     entry marked present or absent as measured on disk, and the paths the
-    attempt's squash actually touched (``git diff`` against ``head_before``,
-    measured before the reset). An empty touched list is stated explicitly —
-    "the agent wrote nothing" is evidence, and the reported run's third
-    attempt was exactly that.
+    attempt changed (`format_changed_paths` over the diff the guard judged,
+    measured before the reset). An empty list is stated explicitly — "the
+    agent wrote nothing" is evidence, and the reported run's third attempt
+    was exactly that. *touched* is None when git could not name the diff.
 
     The issue also asked for ``git status --porcelain``. At this point the
     attempt's work is already squashed, so the working tree is clean and the
@@ -5272,10 +5298,9 @@ def format_deliverable_missing_note(
             state = f"PRESENT — {p.stat().st_size} bytes"
         lines.append(f"- `{path}` — {state}")
     lines += ["", "## Files this attempt touched", ""]
-    if touched:
-        lines += [f"- `{t}`" for t in touched]
-    else:
-        lines.append("(none — the attempt's squash changed no tracked file)")
+    lines.append(
+        "(unknown — git could not name this attempt's diff)"
+        if touched is None else format_changed_paths(wu, touched))
     lines.append("")
     return "\n".join(lines)
 
@@ -11678,20 +11703,23 @@ def early_produces_refusal(
     verification should run.
 
     Checks in the post-squash guards' order, so the same one wins:
-    ``{"outcome": "deliverable_missing", "summary"}``,
-    ``{"outcome": "no_deliverable_files", "summary"}``, or
-    ``{"outcome": "produces_not_in_diff", "remaining", "touched"}``.
+    ``{"outcome": "deliverable_missing", "summary", "touched"}``,
+    ``{"outcome": "no_deliverable_files", "summary", "touched"}``, or
+    ``{"outcome": "produces_not_in_diff", "remaining", "touched"}``;
+    ``touched`` is the pending diff (None if git cannot name it).
     The last two stay silent when git cannot name the pending diff.
     """
     present, summary = assert_declared_deliverables(wu)
-    if not present:
-        return {"outcome": "deliverable_missing", "summary": summary}
     touched = pending_squash_names(head_before, untracked_before)
+    if not present:
+        return {"outcome": "deliverable_missing", "summary": summary,
+                "touched": touched}
     if touched is None:
         return None
     touched_ok, summary = assert_implementation_touched_files(wu, touched)
     if not touched_ok:
-        return {"outcome": "no_deliverable_files", "summary": summary}
+        return {"outcome": "no_deliverable_files", "summary": summary,
+                "touched": touched}
     if not wu.produces:
         return None
     remaining = decide_produces_in_diff(wu, touched, result_block, cfg)[0]
@@ -11708,15 +11736,18 @@ _NOT_VERIFIED_NOTE = (
 def refuse_deliverable_missing(
     wu: WorkUnit, attempt: int, usage: dict, summary: str,
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
-    untracked_before, verification_ran: bool,
+    untracked_before, verification_ran: bool, changed: "list[str] | None",
 ) -> "tuple[str, dict]":
     """Settle the tree and build the record of a `deliverable_missing`
-    refusal for either call site. Returns ``(note, event)``."""
+    refusal for either call site. Returns ``(note, event)``.
+
+    *changed* is the diff the note lists; *touched* is the event's
+    `files_touched`."""
     # Composed BEFORE the reset. The reset rolls the attempt back, so
     # afterwards every declared path reads ABSENT and the note would lose the
     # one distinction it exists to record — which of the declared
     # deliverables the attempt did land (#1412).
-    note = format_deliverable_missing_note(wu, summary, touched, attempt)
+    note = format_deliverable_missing_note(wu, summary, changed, attempt)
     if not verification_ran:
         note += _NOT_VERIFIED_NOTE
     note, retained = _resolve_guard_refusal_tree(
@@ -11739,11 +11770,16 @@ def refuse_deliverable_missing(
 def refuse_no_deliverable_files(
     wu: WorkUnit, attempt: int, usage: dict, summary: str,
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
-    untracked_before, verification_ran: bool,
+    untracked_before, verification_ran: bool, changed: "list[str] | None",
 ) -> "tuple[str, dict]":
     """Settle the tree and build the record of a `no_deliverable_files`
     refusal for either call site. Returns ``(note, event)``."""
-    note = summary if verification_ran else summary + _NOT_VERIFIED_NOTE
+    note = summary
+    if changed is not None:
+        note += ("\n\nPaths this attempt changed:\n"
+                 + format_changed_paths(wu, changed))
+    if not verification_ran:
+        note += _NOT_VERIFIED_NOTE
     note, retained = _resolve_guard_refusal_tree(
         cfg, head_before, events_path, untracked_before, note,
         failure_class="guard_refusal", verification_ran=verification_ran,
@@ -11770,6 +11806,8 @@ def refuse_produces_not_in_diff(
     if not verification_ran:
         note += _NOT_VERIFIED_NOTE
     excerpt = extract_failure_excerpt(note)
+    note += ("\n\nPaths this attempt changed:\n"
+             + format_changed_paths(wu, touched))
     note, retained = _resolve_guard_refusal_tree(
         cfg, head_before, events_path, untracked_before, note,
         failure_class="produces_not_in_diff",
@@ -13130,6 +13168,7 @@ def run(
                             events_path=events_path,
                             untracked_before=untracked_before,
                             verification_ran=False,
+                            changed=payload["touched"],
                         )
                         wu_events.append(_early_event)
                         # `+=` for the reason given at the late
@@ -13310,6 +13349,8 @@ def run(
                                     events_path=events_path,
                                     untracked_before=untracked_before,
                                     verification_ran=True,
+                                    changed=(git_diff_names(head_before, sha)
+                                             if sha else []),
                                 ))
                             wu_events.append(_deliv_event)
                             refusal_history.append(
@@ -13347,6 +13388,7 @@ def run(
                                     events_path=events_path,
                                     untracked_before=untracked_before,
                                     verification_ran=True,
+                                    changed=touched,
                                 ))
                             wu_events.append(_impl_event)
                             refusal_history.append(
