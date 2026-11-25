@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 produces:
@@ -12,6 +12,13 @@ produces:
   - tests/test_fail_fast_deliverables.py
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-25T23:34:48.608747+00:00
+duration_seconds: 228.013
+cost_usd: 0.474428
+input_tokens: 34
+output_tokens: 12969
 ---
 
 # T04 — arm-time warning for an unmentioned `produces:` path, and docs

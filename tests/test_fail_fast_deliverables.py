@@ -4,18 +4,21 @@
 #
 """FEAT-LOOP-2026-0251 gate 1 oracle — a missing deliverable is refused before
 the verification gates run. One class per Definition-of-done clause in
-GATE-01.md. T01 implements clause 1; the rest are skipped naming their owning
-unit.
+GATE-01.md.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
+from specfuse.loop import lint_plan
 from tests._loop_loader import load_loop
 from tests._workspace import integration_workspace
 
@@ -408,13 +411,55 @@ class TestTreeAndNote(_Case):
         self.assertIn("and 10 more", note)
 
 
-@unittest.skip("FEAT-LOOP-2026-0251/T04")
-class TestArmTimeWarning(unittest.TestCase):
+class TestArmTimeWarning(_Case):
     """Clause 5 — arm-time WARN for an unmentioned `produces:` path."""
 
-    def test_pending(self):
-        self.fail("T04")
+    PATH = "docs/guides/widget-notes.md"
 
+    def _lint(self, status: str, body: str) -> str:
+        with tempfile.TemporaryDirectory() as tmp:
+            fdir = Path(tmp)
+            (fdir / "WU-T01.md").write_text(
+                f"---\nid: {T01}\nstatus: {status}\nproduces:\n"
+                f"  - {self.PATH}\n---\n\n{body}\n"
+            )
+            gates = [{"gate": 1, "work_units": [
+                {"id": T01, "file": "WU-T01.md"}]}]
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                lint_plan.check_produces_mentioned(fdir, gates)
+            return out.getvalue()
+
+    def test_pending_unmentioned_warns(self):
+        out = self._lint("pending", "Write the notes.")
+        self.assertIn("WARN:", out)
+        self.assertIn(T01, out)
+        self.assertIn(self.PATH, out)
+        self.assertIn("produces_not_in_diff", out)
+
+    def test_file_name_mention_is_silent(self):
+        self.assertEqual(self._lint("pending", "Write widget-notes.md."), "")
+
+    def test_full_path_mention_is_silent(self):
+        self.assertEqual(self._lint("pending", f"Write {self.PATH}."), "")
+
+    def test_parent_directory_mention_is_silent(self):
+        self.assertEqual(self._lint("pending", "Add under docs/guides."), "")
+
+    def test_done_and_abandoned_are_silent(self):
+        for status in ("done", "abandoned"):
+            with self.subTest(status=status):
+                self.assertEqual(self._lint(status, "Write the notes."), "")
+
+    def test_lint_runs_the_check(self):
+        _, fdir = self._workspace()
+        wu = fdir / "WU-T01.md"
+        wu.write_text(wu.read_text().replace(
+            "src/rule.py", "zzz/unnamed-thing.md"))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            lint_plan.lint(fdir)
+        self.assertIn("zzz/unnamed-thing.md", out.getvalue())
 
 if __name__ == "__main__":
     unittest.main()
