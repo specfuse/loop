@@ -312,7 +312,33 @@ class TestNothingExistingChanges(unittest.TestCase):
         self.assertIn("gate_result", schema["event_types"])
 
     def test_emitted_events_validate(self):
+        import importlib.resources
+        from unittest import mock
+
         from specfuse.loop import validate_event
+        # Pin the validator to the real packaged schemas and clear its module
+        # caches, as tests/test_event_gate_full_envelope.py does: another test
+        # in the full suite can leave `_DRIVER_EVENT_TYPES_CACHE` holding an
+        # empty set, which drops every driver event type from the enum.
+        root = importlib.resources.files("specfuse.loop").joinpath("data", "schemas")
+        for name, value in (
+            ("SCHEMA_ROOT", root),
+            ("SCHEMA_PATH", root / "event.schema.json"),
+            ("PER_TYPE_SCHEMA_DIR", root / "events"),
+            ("DRIVER_SCHEMA_PATH", root / "driver-event.schema.json"),
+        ):
+            patcher = mock.patch.object(validate_event, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        validate_event._PER_TYPE_CACHE.clear()
+        validate_event._DRIVER_EVENT_TYPES_CACHE = None
+        validate_event._DRIVER_CORRELATION_PATTERNS_CACHE = validate_event._UNSET
+        self.addCleanup(validate_event._PER_TYPE_CACHE.clear)
+        self.addCleanup(setattr, validate_event, "_DRIVER_EVENT_TYPES_CACHE", None)
+        self.addCleanup(setattr, validate_event,
+                        "_DRIVER_CORRELATION_PATTERNS_CACHE", validate_event._UNSET)
+        self.addCleanup(loop._PHASE_GATE_RESULTS.update,
+                        {"baseline": [], "broad": []})
         validator = validate_event.load_validator()
         wu = loop.WorkUnit(
             wu_id="FEAT-LOOP-2026-9999/T01", file=Path("WU-01.md"),
