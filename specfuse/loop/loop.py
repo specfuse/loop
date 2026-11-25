@@ -11634,6 +11634,27 @@ def ready(units: list[WorkUnit], done_ids: set[str]) -> list[WorkUnit]:
             if u.status in DISPATCHABLE and all(d in done_ids for d in u.depends_on)]
 
 
+def reset_interrupted_units(units: "list[WorkUnit]", backend) -> "list[WorkUnit]":
+    """Return every `in_progress` unit to `pending` with `attempts: 0` (#3602).
+
+    A unit is `in_progress` only while a driver is running it, and a driver
+    killed mid-attempt never moves it to an outcome. Call this only while
+    holding the working tree's `.specfuse/.loop.lock`: then no other driver in
+    this tree can be running the unit, so the status is provably orphaned and
+    resetting it is the recovery `describe_stranded_units` used to ask the
+    operator to make by hand. The killed attempt does not count: the attempt
+    loop numbers a fresh dispatch from 1. `blocked_human` is a deliberate stop
+    and is never touched here.
+    """
+    reset = []
+    for wu in units:
+        if wu.status == "in_progress":
+            backend.set_wu(wu, "status", "pending")
+            backend.set_wu(wu, "attempts", 0)
+            reset.append(wu)
+    return reset
+
+
 def describe_stranded_units(
     stranded: "list[WorkUnit]", *, gate_number: int,
     abandoned_ids: "set[str] | None" = None,
@@ -11698,8 +11719,8 @@ def describe_stranded_units(
     for wu in interrupted:
         lines.append(
             f"\n  {wu.wu_id} was left in_progress by an interrupted run — a "
-            f"driver killed mid-attempt does not move it to an outcome. Reset "
-            f"it to pending with attempts: 0 and re-run.")
+            f"driver killed mid-attempt does not move it to an outcome. A run "
+            f"without --dry-run resets it to pending and dispatches it.")
         lines.append(_downstream_line(wu.wu_id, other, cause_ids))
 
     if waiting_on_abandoned:
@@ -11923,6 +11944,23 @@ def run(
                       f"files, then flip the ones you accept to `status: pending` and "
                       f"re-run.")
             return 2
+
+        # #3602: a unit still `in_progress` belongs to a killed run — this
+        # process holds the tree lock, so nothing else is running it. Reset and
+        # commit it (so a failed attempt's `git reset --hard` cannot restore the
+        # stale status) instead of halting with "never became ready".
+        if not dry_run:
+            interrupted = reset_interrupted_units(units, backend)
+            if interrupted:
+                ids = ", ".join(wu.wu_id for wu in interrupted)
+                commit_bookkeeping(
+                    [wu.file for wu in interrupted],
+                    f"chore(loop): reset {ids} to pending (left in_progress "
+                    f"by an interrupted run)\n\nFeature: {feature_id}",
+                )
+                for wu in interrupted:
+                    print(f"   {wu.wu_id} was left in_progress by an "
+                          f"interrupted run; reset to pending and re-queued.")
 
         # Done-set must include WUs from every PREVIOUS gate that are already done —
         # cross-gate `depends_on` references are valid (e.g. gate 2's implementation
