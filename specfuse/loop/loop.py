@@ -924,6 +924,10 @@ class WorkUnit:
     # claimed — the per-path `produces_unchanged:` justification the contract
     # promises to honour (#3268). None until a session has run.
     result_block: "dict | None" = None
+    # Per-gate results of the latest verify() call (FEAT-LOOP-2026-0250/T01):
+    # side channel so the attempt loop can emit `gate_result` events without
+    # changing the verify_fn call signature. Reset before each attempt.
+    last_gate_results: list = field(default_factory=list)
     # Set by auto_repair_files_changed (FEAT-2026-0103/T03) when a passed
     # attempt's RESULT named untouched paths outside `produces:` that got
     # silently dropped from files_changed. None on every other attempt.
@@ -2936,6 +2940,8 @@ def emit_attempt_outcome(
         "attempt": attempt,
         "outcome": outcome,
         "duration_seconds": usage.get("duration_seconds", 0.0),
+        "agent_seconds": usage.get("agent_seconds", 0.0),
+        "verify_seconds": usage.get("verify_seconds", 0.0),
         "cost_usd": usage.get("cost_usd", 0.0),
         "input_tokens": usage.get("input_tokens", 0),
         "output_tokens": usage.get("output_tokens", 0),
@@ -6753,6 +6759,32 @@ def persist_gate_output(feature_dir: Path, gate_name: str,
         return None
 
 
+# Per-gate results of the most recent fresh baseline probe / broad run
+# (FEAT-LOOP-2026-0250/T03). Side channel so `probe_baseline` and
+# `run_gate_broad_set` keep their return shapes; consumed (and cleared) by
+# `build_phase_gate_events` where the caller owns an event list.
+_PHASE_GATE_RESULTS: dict[str, list] = {"baseline": [], "broad": []}
+
+
+def build_phase_gate_events(phase: str, correlation_id: str) -> list[dict]:
+    """One `gate_result` event per gate the last fresh *phase* run (`baseline`
+    or `broad`) executed, with `attempt: null`. Consumes the recorded results,
+    so a later call without a fresh run returns an empty list."""
+    results = _PHASE_GATE_RESULTS.get(phase) or []
+    _PHASE_GATE_RESULTS[phase] = []
+    events = []
+    for gr in results:
+        events.append(build_event("gate_result", correlation_id, {
+            "attempt": None,
+            "gate": gr["name"],
+            "ok": bool(gr["ok"]),
+            "skipped": bool(gr.get("skipped", False)),
+            "duration_seconds": gr.get("duration_seconds", 0),
+            "phase": phase,
+        }))
+    return events
+
+
 def _run_gate_set(
     gate_set: list, feature_dir: Path,
     _capture_returncodes: "dict | None" = None,
@@ -6795,6 +6827,8 @@ def _run_gate_set(
                     f"### {gate['name']}: SKIP — dependency "
                     f"'{failed_dep}' failed"
                 ),
+                "skipped": True,
+                "duration_seconds": 0,
             })
             continue
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
@@ -6837,6 +6871,7 @@ def _run_gate_set(
                         f"(https://git-scm.com/download/win) so gate commands can "
                         f"run through bash.exe.\n```"
                     ),
+                    "duration_seconds": 0,
                 })
                 continue
             popen_argv = [bash, "-c", command]
@@ -6844,6 +6879,7 @@ def _run_gate_set(
         else:
             popen_argv = command
             popen_kwargs = dict(shell=True)  # nosec B604
+        gate_started = time.monotonic()
         proc = subprocess.Popen(  # nosec B602
             popen_argv, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -6885,6 +6921,7 @@ def _run_gate_set(
                 f"(process group) — a hang (test reading stdin, infinite loop, "
                 f"or a wedged subprocess)."
             ]
+        gate_duration = round(time.monotonic() - gate_started, 3)
         if not ok:
             failed_names.add(gate["name"])
         log_path = persist_gate_output(feature_dir, gate["name"], out)
@@ -6895,6 +6932,7 @@ def _run_gate_set(
             "ok": ok,
             "report": (f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
                        f"```\n$ {command}\n" + "\n".join(tail) + "\n```"),
+            "duration_seconds": gate_duration,
         })
     return results
 
@@ -6937,6 +6975,7 @@ def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bo
     """
     if cfg is None:
         cfg = load_verification()
+    _PHASE_GATE_RESULTS["broad"] = []
     gate_set = cfg.get("code") or []
     if not gate_set:
         return False, [{
@@ -6962,6 +7001,7 @@ def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bo
         }]
     gate_set = resolve_gate_tiers(gate_set, "broad")
     gate_results = _run_gate_set(gate_set, feature_dir)
+    _PHASE_GATE_RESULTS["broad"] = list(gate_results)
     failing = []
     for g in gate_results:
         if g["ok"]:
@@ -7723,8 +7763,10 @@ def verify(wu: WorkUnit, feature_dir: Path,
                         f"is not a work-unit failure — fix "
                         f"{Path(gate_file).name} and re-run."
                     ),
+                    "duration_seconds": g.get("duration_seconds", 0),
                 }
                 break
+    wu.last_gate_results = list(gate_results)
     ok_all = all(g["ok"] for g in gate_results)
     for note in fallback_notes:
         print(f"  {note}", file=sys.stderr)
@@ -7745,6 +7787,7 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
     """
     if cfg is None:
         cfg = load_verification()
+    _PHASE_GATE_RESULTS["baseline"] = []
     gate_set = cfg.get("code") or []
     try:
         gate_set = order_gate_set(gate_set)
@@ -7759,6 +7802,7 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
             ),
         }]
     gate_results = _run_gate_set(gate_set, feature_dir)
+    _PHASE_GATE_RESULTS["baseline"] = list(gate_results)
     failing = []
     for g in gate_results:
         if g["ok"]:
@@ -8259,6 +8303,7 @@ def gate_baseline_check(
             return baseline["failing"], False
     if probed_at is None:
         probed_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    _PHASE_GATE_RESULTS["baseline"] = []
     failing = probe_baseline(feature_dir, cfg)
     write_gate_baseline(
         gate_file, head_sha, probed_at, failing, feature_dir, source=source)
@@ -8320,6 +8365,23 @@ def _accepts_gate_file(fn) -> bool:
         p.name == "gate_file" or p.kind is inspect.Parameter.VAR_KEYWORD
         for p in params.values()
     )
+
+
+def build_attempt_gate_events(wu: "WorkUnit", attempt: int) -> list[dict]:
+    """One `gate_result` event per gate `verify()` ran for this attempt
+    (FEAT-LOOP-2026-0250/T01), read from `wu.last_gate_results`. Empty when
+    verify was stubbed or never reached."""
+    events = []
+    for gr in (getattr(wu, "last_gate_results", None) or []):
+        events.append(build_event("gate_result", wu.wu_id, {
+            "attempt": attempt,
+            "gate": gr["name"],
+            "ok": bool(gr["ok"]),
+            "skipped": bool(gr.get("skipped", False)),
+            "duration_seconds": gr.get("duration_seconds", 0),
+            "phase": "attempt",
+        }))
+    return events
 
 
 def execute_unit_attempt(
@@ -8404,14 +8466,22 @@ def execute_unit_attempt(
     worklist_section = format_reverification_worklist(wu, feature_dir)
     if worklist_section:
         wu.body = wu.body + "\n\n" + worklist_section
+    _agent_t0 = time.monotonic()
     if dispatch_fn is None:
         result = dispatch(wu, failure_note, cost_tracking)
     else:
         result = dispatch_fn(wu, failure_note)
+    agent_seconds = time.monotonic() - _agent_t0
     if isinstance(result, tuple):
         stdout, usage = result
     else:
         stdout, usage = result, None
+    # FEAT-LOOP-2026-0250/T02: split the attempt's time into agent session and
+    # verification. Always a fresh dict so a stub's own usage is never mutated;
+    # a plain-string stub (usage None) still gets the timing keys.
+    usage = dict(usage) if usage else {}
+    usage["agent_seconds"] = agent_seconds
+    usage["verify_seconds"] = 0
     # Zero-token guard runs BEFORE RESULT-block parsing: the agent did not
     # produce output, so any block in stdout is hallucinated upstream and
     # must not be trusted (FEAT-2026-0008/T01). Opt-in via cost tracking —
@@ -8426,10 +8496,14 @@ def execute_unit_attempt(
         # deciding whether to insert a fix unit instead of escalating.
         wu.result_block = parse_result_block(stdout or "")
         return "blocked", reason, usage
-    if _accepts_gate_file(verify_fn):
-        passed, evidence = verify_fn(wu, feature_dir, gate_file=gate_file)
-    else:
-        passed, evidence = verify_fn(wu, feature_dir)
+    _verify_t0 = time.monotonic()
+    try:
+        if _accepts_gate_file(verify_fn):
+            passed, evidence = verify_fn(wu, feature_dir, gate_file=gate_file)
+        else:
+            passed, evidence = verify_fn(wu, feature_dir)
+    finally:
+        usage["verify_seconds"] = time.monotonic() - _verify_t0
     if not passed:
         return "failed", evidence, usage
     # files_changed guard (FEAT-2026-0008/T02): the agent's RESULT claim
@@ -12051,6 +12125,8 @@ def run(
                                 "ok": _broad_ok,
                                 "failing": _broad_failing,
                             }))
+                        _broad_events.extend(
+                            build_phase_gate_events("broad", feature_id))
                     if not _broad_ok:
                         backend.set_gate(gate, "awaiting_review")
                         escalation_message = format_broad_run_failure(
@@ -12399,11 +12475,13 @@ def run(
                         reason = failure_note.strip().splitlines()[0][:200]
                         print(f"   retry reason: {reason}")
                     t0 = time.monotonic()
+                    wu.last_gate_results = []
                     outcome, payload, usage = execute_unit_attempt(
                         wu, feature_dir, failure_note, cost_tracking=cost_tracking,
                         head_before=head_before, prerun_cfg=cfg,
                         gate_file=gate.file,
                     )
+                    wu_events.extend(build_attempt_gate_events(wu, attempt))
                     duration = round(time.monotonic() - t0, 3)
                     attempt_record: dict = {"attempt": attempt,
                                             "duration_seconds": duration}
@@ -13426,6 +13504,8 @@ def run(
                                         "failing": _attr_failing,
                                         "attributed_to": wu.wu_id,
                                     }))
+                                wu_events.extend(
+                                    build_phase_gate_events("baseline", wu.wu_id))
                             if _attr_failing:
                                 # Pre-existing: this attempt did not cause the
                                 # failure, so it is not counted against the

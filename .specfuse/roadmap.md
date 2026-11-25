@@ -128,6 +128,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0247) |
 | FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
 | FEAT-LOOP-2026-0249 | Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0249) |
+| FEAT-LOOP-2026-0250 | Record verification gate results and durations | done | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ archive](roadmap-archive.md#feat-loop-2026-0250) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it

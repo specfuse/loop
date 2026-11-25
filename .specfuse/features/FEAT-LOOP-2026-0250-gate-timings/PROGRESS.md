@@ -1,0 +1,7 @@
+- **FEAT-LOOP-2026-0250/T01**: _run_gate_set times each spawned gate (duration_seconds, skipped gates get skipped:True and duration_seconds:0). verify() stores the per-gate results on wu.last_gate_results, and run() emits one attempt-phase gate_result per gate via build_attempt_gate_events. The schema now lists gate_result.
+  - note: Side channel is WorkUnit.last_gate_results, reset before each attempt, so the verify_fn signature is unchanged. Reuse build_event("gate_result", ...) with phase baseline or broad for T03.
+- **FEAT-LOOP-2026-0250/T02**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0250/T03**: Added gate_result events for fresh baseline probes (phase "baseline") and fresh broad runs (phase "broad"), both with attempt null. Tree-unchanged skips emit none. TestBaselineAndBroadPhases now has real tests and they pass; the narrow tier passes.
+- **FEAT-LOOP-2026-0250/T04**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0250/G1-CLOSE**: Wrote RETROSPECTIVE.md (per-clause proof, cost reconciliation, "did NOT verify"), three changelog.d fragments tracing to FEAT-LOOP-2026-0250, LEARNINGS-pending.md, and annotated the 12 criteria in GATE-01-CRITERIA.md. I set verdict met in WU-90. The closing lint passes.
+  - note: This feature's own agent/verify split reads "not recorded" because all 5 attempts ran on builds pinned before T01-T03 landed. The first real split will show on the next feature run after merge. Two post-merge items remain open (real-attempt check, and running stats on the motivating corpus).

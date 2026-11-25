@@ -43,6 +43,24 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-loop-2026-0250"></a>
+## FEAT-LOOP-2026-0250 — Record verification gate results and durations
+
+**Why.** `attempt_outcome.duration_seconds` is one timer around the agent session and every verification gate together, and no event records which gates ran, how long each took, or which passed. An operator report measured 184 attempts, about 17.5 hours of attempt time, with no way to say how much was the agent and how much the gates, so every optimisation (smaller units, model or effort, a faster gate, parallel gates) is a guess.
+
+**Goal.** One `gate_result` event per gate per run (attempt, baseline probe, broad run) with its outcome and duration; `agent_seconds` and `verify_seconds` on `attempt_outcome`; `specfuse stats` reports the agent/verify split per feature and the slowest gates, and says "not recorded" on older logs. One gate, four units and a terminal close.
+
+**Out of scope.** A live progress view or halt notification, parallel gates or a result cache, backfilling old logs, persisting events from killed attempts.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- Run one real feature and check that `agent_seconds + verify_seconds` is close to
+  `duration_seconds` on real attempts (the oracle stubs the agent session).
+- Run `specfuse stats` on the corpus that motivated this feature and confirm the slowest-gates
+  view names real gates.
+
 <a id="feat-loop-2026-0249"></a>
 ## FEAT-LOOP-2026-0249 — Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md
 

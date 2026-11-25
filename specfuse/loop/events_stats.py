@@ -95,6 +95,7 @@ def collect(roots: list[Path] | list[str]) -> dict:
     """
     seen: set[tuple] = set()
     attempts: list[dict] = []
+    gate_runs: list[dict] = []
     repos: set[str] = set()
 
     for root in roots:
@@ -124,14 +125,31 @@ def collect(roots: list[Path] | list[str]) -> dict:
                     continue  # a torn line is not a reason to abandon the corpus
                 if not isinstance(event, dict):
                     continue
-                if event.get("event_type") != "attempt_outcome":
+                if event.get("event_type") not in ("attempt_outcome", "gate_result"):
                     continue
+                # `gate_result` shares the timestamp of its sibling gates within
+                # one flush, so the gate name and phase join the key; for
+                # `attempt_outcome` the three-part key is unchanged.
+                payload = event.get("payload") or {}
                 key = (event.get("correlation_id"), event.get("timestamp"),
                        event.get("event_type"))
+                if event["event_type"] == "gate_result":
+                    key += (payload.get("gate"), payload.get("phase"),
+                            payload.get("attempt"))
                 if key in seen:
                     continue
                 seen.add(key)
-                payload = event.get("payload") or {}
+                if event["event_type"] == "gate_result":
+                    if payload.get("gate") is None:
+                        continue
+                    gate_runs.append({
+                        "gate": str(payload["gate"]),
+                        "phase": payload.get("phase") or "attempt",
+                        "seconds": float(payload.get("duration_seconds") or 0.0),
+                        "feature": path.parent.name,
+                    })
+                    repos.add(repo)
+                    continue
                 attempts.append({
                     "cid": event.get("correlation_id") or "",
                     "outcome": payload.get("outcome"),
@@ -141,6 +159,10 @@ def collect(roots: list[Path] | list[str]) -> dict:
                     "diagnosed": any(payload.get(f) for f in _DIAGNOSTIC_FIELDS),
                     "repo": repo,
                     "feature": path.parent.name,
+                    "agent_s": (float(payload["agent_seconds"])
+                                if "agent_seconds" in payload else None),
+                    "verify_s": (float(payload["verify_seconds"])
+                                 if "verify_seconds" in payload else None),
                 })
                 repos.add(repo)
 
@@ -193,6 +215,37 @@ def collect(roots: list[Path] | list[str]) -> dict:
             g["fires"] += 1
             g["waste"] = round(g["waste"] + a["cost"], 2)
 
+    # Agent/verify split per feature. Only attempts that carry both fields
+    # count; an old corpus has neither, and must read "not recorded", never 0.
+    split: dict[str, dict] = {}
+    for a in attempts:
+        if a["agent_s"] is None or a["verify_s"] is None:
+            continue
+        f = split.setdefault(f"{a['repo']}:{a['feature']}", {
+            "attempts": 0, "agent_seconds": 0.0, "verify_seconds": 0.0})
+        f["attempts"] += 1
+        f["agent_seconds"] += a["agent_s"]
+        f["verify_seconds"] += a["verify_s"]
+    for f in split.values():
+        total = f["agent_seconds"] + f["verify_seconds"]
+        f["agent_seconds"] = round(f["agent_seconds"], 2)
+        f["verify_seconds"] = round(f["verify_seconds"], 2)
+        f["agent_share"] = round(f["agent_seconds"] / total, 4) if total else 0.0
+        f["verify_share"] = round(f["verify_seconds"] / total, 4) if total else 0.0
+
+    # Slowest gates, split by phase, ordered by total seconds.
+    by_gate: dict[tuple, list[float]] = {}
+    for g in gate_runs:
+        by_gate.setdefault((g["phase"], g["gate"]), []).append(g["seconds"])
+    gate_timings = [
+        {"phase": phase, "gate": gate, "runs": len(secs),
+         "total_seconds": round(sum(secs), 2),
+         "median_seconds": round(statistics.median(secs), 2),
+         "max_seconds": round(max(secs), 2)}
+        for (phase, gate), secs in by_gate.items()
+    ]
+    gate_timings.sort(key=lambda r: (-r["total_seconds"], r["phase"], r["gate"]))
+
     spend = round(sum(a["cost"] for a in attempts), 2)
     waste = round(sum(a["cost"] for a in attempts if a["outcome"] != "passed"), 2)
     return {
@@ -208,6 +261,8 @@ def collect(roots: list[Path] | list[str]) -> dict:
         "by_outcome": by_outcome,
         "by_guard": by_guard,
         "undiagnosed": undiagnosed,
+        "time_split": split,
+        "gate_timings": gate_timings,
     }
 
 
@@ -244,6 +299,31 @@ def render(stats: dict, min_fires: int = 1) -> str:
         out += ["", "waste by outcome", f"  {'outcome':32s} {'n':>5s} {'waste':>9s}"]
         for o, v in sorted(stats["by_outcome"].items(), key=lambda kv: -kv[1]["waste"]):
             out.append(f"  {o:32s} {v['n']:>5d} {v['waste']:>9.2f}")
+
+    out += ["", "agent / verify time per feature"]
+    split = stats.get("time_split") or {}
+    if not split:
+        out.append("  not recorded")
+    else:
+        out.append(f"  {'feature':54s} {'agent s':>9s} {'verify s':>9s} "
+                   f"{'agent%':>7s} {'verify%':>8s}")
+        for name, v in sorted(split.items(), key=lambda kv: -(
+                kv[1]["agent_seconds"] + kv[1]["verify_seconds"])):
+            out.append(f"  {name:54s} {v['agent_seconds']:>9.2f} "
+                       f"{v['verify_seconds']:>9.2f} {v['agent_share'] * 100:>6.0f}% "
+                       f"{v['verify_share'] * 100:>7.0f}%")
+
+    out += ["", "slowest gates (gate_result events)"]
+    timings = stats.get("gate_timings") or []
+    if not timings:
+        out.append("  not recorded")
+    else:
+        out.append(f"  {'phase':9s} {'gate':32s} {'runs':>5s} {'total s':>9s} "
+                   f"{'median s':>9s} {'max s':>8s}")
+        for r in timings:
+            out.append(f"  {r['phase']:9s} {r['gate']:32s} {r['runs']:>5d} "
+                       f"{r['total_seconds']:>9.2f} {r['median_seconds']:>9.2f} "
+                       f"{r['max_seconds']:>8.2f}")
 
     if stats["undiagnosed"]:
         out += ["", f"  {stats['undiagnosed']} non-passing attempts carry no "

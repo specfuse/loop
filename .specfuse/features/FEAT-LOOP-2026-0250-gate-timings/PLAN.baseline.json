@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 walking skeleton: attempt-phase `gate_result` events",
+          "id": "FEAT-LOOP-2026-0250/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 `agent_seconds` and `verify_seconds` on `attempt_outcome`",
+          "id": "FEAT-LOOP-2026-0250/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T03 \u2014 `gate_result` events for the baseline probe and the broad run",
+          "id": "FEAT-LOOP-2026-0250/T03",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T04 \u2014 `specfuse stats` reports the split and the slowest gates; docs",
+          "id": "FEAT-LOOP-2026-0250/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE \u2014 terminal close",
+          "id": "FEAT-LOOP-2026-0250/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

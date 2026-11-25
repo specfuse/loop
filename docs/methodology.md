@@ -466,6 +466,24 @@ deliberate versioning decision — **and an update here in the same commit.**
 Five of the values above shipped without that step, and the drift was
 found only when someone mined the corpus (#270).
 
+**Timings (FEAT-LOOP-2026-0250).** `attempt_outcome` carries `agent_seconds`
+(the dispatched session) and `verify_seconds` (the gate set); their sum is at
+most `duration_seconds`. An attempt that stopped before verification, such as
+a `blocked` one, records `verify_seconds: 0`. Events written before this
+feature lack both fields, and `specfuse stats` reports them as `not recorded`,
+never as zero.
+
+Each gate a run executes also emits one `gate_result` event, payload
+`attempt`, `gate`, `ok`, `skipped`, `duration_seconds`, `phase`. `phase` is one
+of three values: `attempt` (the per-attempt verify, `feature_oracle` included;
+`attempt` is the attempt number), `baseline` (the baseline probe) and `broad`
+(the once-per-gate broad run); the last two carry `attempt: null`. A gate
+skipped because a dependency failed records `ok: false`, `skipped: true`,
+`duration_seconds: 0`. A broad run skipped because the tree is unchanged emits
+none. Attempt-phase events are buffered in memory and flushed with the
+attempt's `attempt_outcome`, so an attempt killed before its outcome is
+recorded loses its `gate_result` events too; stats undercount such attempts.
+
 `failure_class` taxonomy is **locked at v1**: `tests | lint |
 security | coverage | symbol_existence | bandit | other | null`.
 `failure_class: other` is the explicit catch-all for paths not yet
