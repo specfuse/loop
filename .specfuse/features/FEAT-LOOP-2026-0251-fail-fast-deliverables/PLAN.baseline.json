@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 walking skeleton: refuse `produces_not_in_diff` before `verify()`",
+          "id": "FEAT-LOOP-2026-0251/T01",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 presence refusals early, and the `fail_fast_deliverables` opt-out",
+          "id": "FEAT-LOOP-2026-0251/T02",
+          "planned_cost_usd": 1.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T03 \u2014 the retry note lists the paths the attempt did change",
+          "id": "FEAT-LOOP-2026-0251/T03",
+          "planned_cost_usd": 1.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T04 \u2014 arm-time warning for an unmentioned `produces:` path, and docs",
+          "id": "FEAT-LOOP-2026-0251/T04",
+          "planned_cost_usd": 1.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE \u2014 terminal close",
+          "id": "FEAT-LOOP-2026-0251/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
