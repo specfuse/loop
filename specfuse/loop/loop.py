@@ -54,6 +54,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -2860,7 +2861,8 @@ _GUARD_FAILURE_CLASSES = frozenset(
 
 
 def synthesize_retry_directive(failure_class: "str | None", *,
-                               retained: bool = False) -> str:
+                               retained: bool = False,
+                               verification_ran: bool = True) -> str:
     """Return a forward-looking retry instruction for *failure_class* (#175).
 
     Prepended to the failure note fed into the next attempt. The note itself
@@ -2876,9 +2878,12 @@ def synthesize_retry_directive(failure_class: "str | None", *,
             # convergent unit mid-iteration: the tree is retained because
             # verify() already PASSED on it, and the one thing to avoid is
             # re-authoring work that is already correct.
+            verified = (
+                "and verification already PASSED on them" if verification_ran
+                else "but verification did not run on them")
             lead = ("A bookkeeping guard refused this attempt's pass. The "
                     "previous attempt's edits are STILL PRESENT in the "
-                    "working tree, and verification already PASSED on them "
+                    f"working tree, {verified} "
                     "— re-authoring them is the one thing not to do. Apply "
                     "only the mechanical fix below, then re-emit the RESULT "
                     "block in full. ")
@@ -2900,12 +2905,15 @@ def synthesize_retry_directive(failure_class: "str | None", *,
     hint = _RETRY_CLASS_HINT.get(
         failure_class or "",
         "Satisfy every declared gate before declaring done.")
+    if not verification_ran and not retained:
+        lead = "The attempt was refused early: verification did not run. " + lead
     return lead + hint
 
 
 def compose_guard_repair_note(
     failure_class: "str | None", complaint: str,
     retained_diff: "str | None", retained: bool,
+    verification_ran: bool = True,
 ) -> str:
     """Build the retry note for a bookkeeping-guard refusal (FEAT-2026-0103).
 
@@ -2916,7 +2924,7 @@ def compose_guard_repair_note(
     not the instruction itself.
     """
     note = complaint + "\n\n" + synthesize_retry_directive(
-        failure_class, retained=retained)
+        failure_class, retained=retained, verification_ran=verification_ran)
     if retained and retained_diff:
         note += (
             "\n\nRetained diff (your tree is still here):\n\n"
@@ -5022,6 +5030,7 @@ def retain_tree_after_refusal(
 def _resolve_guard_refusal_tree(
     cfg: dict, head_before: str, events_path: Path,
     untracked_before, note: str, failure_class: "str | None" = None,
+    verification_ran: bool = True,
 ) -> "tuple[str, bool]":
     """Shared retain-or-reset decision for the four bookkeeping-guard sites.
 
@@ -5033,10 +5042,12 @@ def _resolve_guard_refusal_tree(
     if resolve_retain_on_guard_refusal(cfg):
         diff = retain_tree_after_refusal(head_before, events_path,
                                          untracked_before=untracked_before)
-        return compose_guard_repair_note(failure_class, note, diff, True), True
+        return compose_guard_repair_note(
+            failure_class, note, diff, True, verification_ran), True
     reset_preserving_events(head_before, events_path,
                             untracked_before=untracked_before)
-    return compose_guard_repair_note(failure_class, note, None, False), False
+    return compose_guard_repair_note(
+        failure_class, note, None, False, verification_ran), False
 
 
 def apply_diff(diff_text: str) -> bool:
@@ -8478,6 +8489,7 @@ def execute_unit_attempt(
     head_before: str | None = None,
     prerun_cfg: dict | None = None,
     gate_file: "Path | None" = None,
+    untracked_before: "set[str] | frozenset[str]" = frozenset(),
 ) -> tuple[str, object, dict | None]:
     """Pre-dispatch + dispatch + parse + (if not blocked) verify cycle.
 
@@ -8493,6 +8505,10 @@ def execute_unit_attempt(
       "zero_token"              — usage reports input_tokens=0 (agent never
                                   ran); payload is None
       "blocked"                 — agent explicitly emitted status: blocked
+      "produces_not_in_diff"    — a declared `produces:` path is untouched
+                                  and unjustified; verify() was NOT called;
+                                  payload is {"remaining", "touched"}
+                                  (FEAT-LOOP-2026-0251/T01)
       "passed"                  — verify() passed AND the files_changed
                                   guard found nothing to flag, or found only
                                   paths outside `produces:` that
@@ -8511,8 +8527,9 @@ def execute_unit_attempt(
     Backward-compatible dispatch_fn contract: stubs may return either a
     plain `str` (treated as text-only, usage=None) or `(str, dict|None)`.
 
-    `head_before` is the pre-attempt HEAD SHA the files_changed guard
-    diffs against. None disables the guard — preserved for unit tests that
+    `head_before` is the pre-attempt HEAD SHA the files_changed guard and the
+    early produces check diff against; `untracked_before` is the snapshot
+    `squash_commit` takes. None disables both — preserved for unit tests that
     exercise this function in isolation without a git working tree.
 
     `prerun_cfg` is a `verification.yml`-shaped dict injectable for testing;
@@ -8579,6 +8596,15 @@ def execute_unit_attempt(
         # deciding whether to insert a fix unit instead of escalating.
         wu.result_block = parse_result_block(stdout or "")
         return "blocked", reason, usage
+    # Fail fast (FEAT-LOOP-2026-0251/T01): a refusal that judges only the
+    # attempt's diff must not first pay for a verification run.
+    if head_before is not None:
+        early_block = parse_result_block(stdout or "")
+        refusal = early_produces_refusal(
+            wu, head_before, untracked_before, early_block, cfg)
+        if refusal is not None:
+            wu.result_block = early_block
+            return "produces_not_in_diff", refusal, usage
     _verify_t0 = time.monotonic()
     try:
         if _accepts_gate_file(verify_fn):
@@ -11525,6 +11551,161 @@ def resolve_produces_amendable(verification_cfg: dict) -> bool:
     return bool(project.get("produces_amendable", True))
 
 
+def decide_produces_in_diff(
+    wu: WorkUnit, touched: list[str], result_block: "dict | None", cfg: dict,
+) -> "tuple[list[str], list[dict], list[dict]]":
+    """The produces-in-diff decision, shared by the early (pre-verify) and
+    late (post-squash) call sites (FEAT-LOOP-2026-0251/T01).
+
+    Returns ``(remaining, justified, amended)``. A non-empty *remaining* is a
+    refusal naming exactly those entries. *amended* is the
+    ``produces_amended:`` drop the caller may apply with
+    `apply_produces_amendment`. Pure: nothing is written here, because an
+    amendment applied before verification passed would outlive the reset of a
+    failed attempt in `wu.produces`.
+    """
+    remaining, justified = resolve_produces_refusal(wu, touched, result_block)
+    if not remaining:
+        return remaining, justified, []
+    # Produces-amendment escape hatch (FEAT-2026-0114/T01): a still-unmatched
+    # entry the RESULT drops under `produces_amended:` with a non-blank reason
+    # is accepted ONLY when every remaining unmatched entry is covered — a
+    # partial amendment still refuses so the still-unjustified path's name
+    # reaches the retry note unchanged.
+    amendments = produces_amendments(result_block)
+    dropped = [
+        {"path": entry, "reason": amendments[entry.removeprefix("./")]}
+        for entry in remaining if entry.removeprefix("./") in amendments
+    ]
+    if not dropped or len(dropped) != len(remaining):
+        return remaining, justified, []
+    drop_keys = {d["path"].removeprefix("./") for d in dropped}
+    kept = [p for p in wu.produces
+            if str(p).removeprefix("./") not in drop_keys]
+    would_be_empty = wu.type == "implementation" and not kept
+    if would_be_empty or not resolve_produces_amendable(cfg):
+        return remaining, justified, []
+    return [], justified, dropped
+
+
+def format_produces_refusal(remaining: list[str]) -> "tuple[str, str, str]":
+    """``(summary, note, failure_signature)`` of a `produces_not_in_diff`
+    refusal naming *remaining*."""
+    summary = ("declared produces path(s) not in this WU's squash diff: "
+               + ", ".join(remaining))
+    note = (
+        summary
+        + "\n\nTwo escape hatches: `produces_unchanged:` "
+          "— the deliverable already holds at HEAD; "
+          "`produces_amended:` — the plan named a path "
+          "this solution did not need."
+        + "\n\nEach listed path is a deliverable this WU "
+          "declared in `produces:` but did not change. "
+          "Either make the declared change this attempt, "
+          "or — if the deliverable already holds at HEAD — "
+          "say so in the RESULT block under "
+          "`produces_unchanged:` with the command and "
+          "output that show it (result-contract.md, "
+          "closing obligation 1). Do not declare done "
+          "while a deliverable is untouched and "
+          "unjustified."
+        + "\n\n"
+        + PRODUCES_REPAIR_EXAMPLE.format(path=remaining[0])
+    )
+    signature = ", ".join(sorted(
+        Path(p).name for p in remaining
+    ))[:100] or "produces_unchanged"
+    return summary, note, signature
+
+
+def pending_squash_names(
+    head_before: str,
+    untracked_before: "set[str] | frozenset[str]" = frozenset(),
+) -> "list[str] | None":
+    """The paths `squash_commit` would put in this attempt's diff, computed
+    without committing and without touching the real index.
+
+    Mirrors `squash_commit` (`add -A`, then unstage the operator's
+    pre-existing untracked files) on a throwaway copy of the index, and
+    filters as `git_diff_names` does. None when git cannot answer.
+    """
+    def run_git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True,
+            env=env,
+        ).stdout.strip()
+
+    env = dict(os.environ)
+    try:
+        index = Path(run_git("rev-parse", "--git-path", "index")).resolve()
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp) / "index"
+            if index.exists():
+                # copy2 keeps the mtime git's racy-index check relies on.
+                shutil.copy2(index, scratch)
+            env["GIT_INDEX_FILE"] = str(scratch)
+            run_git("add", "-A")
+            stale = sorted(p for p in untracked_before if Path(p).exists())
+            if stale:
+                run_git("reset", "-q", head_before, "--", *stale)
+            names = run_git("diff", "--cached", "--name-only",
+                            head_before).splitlines()
+    except (subprocess.CalledProcessError, OSError) as exc:
+        print(f"   early produces check skipped — {exc}")
+        return None
+    return [f for f in names if f and Path(f).name != PROGRESS_FILENAME]
+
+
+def early_produces_refusal(
+    wu: WorkUnit, head_before: str,
+    untracked_before: "set[str] | frozenset[str]",
+    result_block: "dict | None", cfg: dict,
+) -> "dict | None":
+    """The `produces_not_in_diff` refusal decidable before verification, as
+    ``{"remaining", "touched"}``; None when verification should run.
+
+    Stays silent when the presence or empty-files guard would refuse: those
+    run first after the squash and keep their own outcome.
+    """
+    if not wu.produces or not assert_declared_deliverables(wu)[0]:
+        return None
+    touched = pending_squash_names(head_before, untracked_before)
+    if touched is None or not assert_implementation_touched_files(wu, touched)[0]:
+        return None
+    remaining = decide_produces_in_diff(wu, touched, result_block, cfg)[0]
+    if not remaining:
+        return None
+    return {"remaining": remaining, "touched": touched}
+
+
+def refuse_produces_not_in_diff(
+    wu: WorkUnit, attempt: int, usage: dict, remaining: list[str],
+    touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
+    untracked_before, verification_ran: bool,
+) -> "tuple[str, str, dict]":
+    """Settle the tree and build the record of a `produces_not_in_diff`
+    refusal for either call site. Returns ``(summary, note, event)``."""
+    summary, note, signature = format_produces_refusal(remaining)
+    if not verification_ran:
+        note += ("\n\nRefused before the verification gates: verification "
+                 "did not run.")
+    excerpt = extract_failure_excerpt(note)
+    note, retained = _resolve_guard_refusal_tree(
+        cfg, head_before, events_path, untracked_before, note,
+        failure_class="produces_not_in_diff",
+        verification_ran=verification_ran,
+    )
+    event = emit_attempt_outcome(
+        wu, attempt, "produces_not_in_diff", usage,
+        failure_class="produces_not_in_diff",
+        failure_signature=signature,
+        failure_excerpt=excerpt,
+        files_touched=touched,
+        extras={"summary": summary, "tree_retained": retained},
+    )
+    return summary, note, event
+
+
 def apply_produces_amendment(wu: WorkUnit, dropped: list[dict]) -> None:
     """Rewrite *wu*'s `produces:` on disk, dropping *dropped* paths, and
     record why under `produces_dropped:` (FEAT-2026-0114/T01).
@@ -12606,6 +12787,7 @@ def run(
                         wu, feature_dir, failure_note, cost_tracking=cost_tracking,
                         head_before=head_before, prerun_cfg=cfg,
                         gate_file=gate.file,
+                        untracked_before=untracked_before,
                     )
                     wu_events.extend(build_attempt_gate_events(wu, attempt))
                     duration = round(time.monotonic() - t0, 3)
@@ -12831,6 +13013,28 @@ def run(
                               f"{payload or '(no reason given)'}")
                         blocked = True
                         break
+
+                    if outcome == "produces_not_in_diff":
+                        # Refused before verify() (FEAT-LOOP-2026-0251/T01).
+                        _prod_summary, _prod_note, _prod_event = (
+                            refuse_produces_not_in_diff(
+                                wu, attempt, attempts_usage[-1],
+                                payload["remaining"], payload["touched"],
+                                cfg=cfg, head_before=head_before,
+                                events_path=events_path,
+                                untracked_before=untracked_before,
+                                verification_ran=False,
+                            ))
+                        wu_events.append(_prod_event)
+                        # `+=` for the reason given at the late site.
+                        refusal_history += [(_prod_summary, _refusal_touched)]
+                        attempt_notes.append((attempt, _prod_note))
+                        failure_note = _prod_note
+                        print(
+                            f"   PRODUCES NOT IN DIFF attempt "
+                            f"{attempt}/{wu_max_attempts} — {_prod_summary}"
+                        )
+                        continue
 
                     if outcome == "passed":
                         # Flip status to DONE BEFORE the squash so the flip is
@@ -13079,96 +13283,25 @@ def run(
                         # read (#3268). Only the still-unjustified entries
                         # refuse; the accepted ones are recorded on the
                         # passed event.
-                        _prod_remaining, _produces_justified = resolve_produces_refusal(
-                            wu, touched, wu.result_block,
-                        )
+                        _prod_remaining, _produces_justified, _produces_amended = (
+                            decide_produces_in_diff(
+                                wu, touched, wu.result_block, cfg))
                         for _pj in _produces_justified:
                             print(f"   produces: {_pj['path']} unchanged, "
                                   f"justified — {_pj['justification'][:120]}")
-                        # Produces-amendment escape hatch (FEAT-2026-0114/T01):
-                        # a still-unmatched entry the RESULT drops under
-                        # `produces_amended:` with a non-blank reason is
-                        # applied ONLY when every remaining unmatched entry
-                        # is covered — a partial amendment still refuses so
-                        # the still-unjustified path's name reaches the
-                        # retry note unchanged.
-                        _produces_amended: list = []
+                        if _produces_amended:
+                            apply_produces_amendment(wu, _produces_amended)
                         if _prod_remaining:
-                            _amendments = produces_amendments(wu.result_block)
-                            _amend_dropped = []
-                            _amend_remaining = []
-                            for _entry in _prod_remaining:
-                                _key = _entry.removeprefix("./")
-                                if _key in _amendments:
-                                    _amend_dropped.append(
-                                        {"path": _entry,
-                                         "reason": _amendments[_key]})
-                                else:
-                                    _amend_remaining.append(_entry)
-                            if _amend_dropped and not _amend_remaining:
-                                _drop_keys = {
-                                    d["path"].removeprefix("./")
-                                    for d in _amend_dropped
-                                }
-                                _kept_after_drop = [
-                                    p for p in wu.produces
-                                    if str(p).removeprefix("./")
-                                    not in _drop_keys
-                                ]
-                                _would_be_empty = (
-                                    wu.type == "implementation"
-                                    and not _kept_after_drop
-                                )
-                                if not _would_be_empty and resolve_produces_amendable(cfg):
-                                    apply_produces_amendment(wu, _amend_dropped)
-                                    _produces_amended = _amend_dropped
-                                    _prod_remaining = []
-                        prod_ok = not _prod_remaining
-                        prod_summary = "" if prod_ok else (
-                            "declared produces path(s) not in this WU's squash diff: "
-                            + ", ".join(_prod_remaining)
-                        )
-                        if not prod_ok:
-                            _prod_note = (
-                                prod_summary
-                                + "\n\nTwo escape hatches: `produces_unchanged:` "
-                                  "— the deliverable already holds at HEAD; "
-                                  "`produces_amended:` — the plan named a path "
-                                  "this solution did not need."
-                                + "\n\nEach listed path is a deliverable this WU "
-                                  "declared in `produces:` but did not change. "
-                                  "Either make the declared change this attempt, "
-                                  "or — if the deliverable already holds at HEAD — "
-                                  "say so in the RESULT block under "
-                                  "`produces_unchanged:` with the command and "
-                                  "output that show it (result-contract.md, "
-                                  "closing obligation 1). Do not declare done "
-                                  "while a deliverable is untouched and "
-                                  "unjustified."
-                                + "\n\n"
-                                + PRODUCES_REPAIR_EXAMPLE.format(
-                                    path=_prod_remaining[0])
-                            )
-                            _prod_sig = ", ".join(sorted(
-                                Path(p).name for p in _prod_remaining
-                            ))[:100] or "produces_unchanged"
-                            _prod_excerpt = extract_failure_excerpt(_prod_note)
-                            _prod_note, _prod_retained = (
-                                _resolve_guard_refusal_tree(
-                                    cfg, head_before, events_path,
-                                    untracked_before, _prod_note,
-                                    failure_class="produces_not_in_diff",
+                            prod_summary, _prod_note, _prod_event = (
+                                refuse_produces_not_in_diff(
+                                    wu, attempt, attempts_usage[-1],
+                                    _prod_remaining, touched,
+                                    cfg=cfg, head_before=head_before,
+                                    events_path=events_path,
+                                    untracked_before=untracked_before,
+                                    verification_ran=True,
                                 ))
-                            wu_events.append(emit_attempt_outcome(
-                                wu, attempt, "produces_not_in_diff",
-                                attempts_usage[-1],
-                                failure_class="produces_not_in_diff",
-                                failure_signature=_prod_sig,
-                                failure_excerpt=_prod_excerpt,
-                                files_touched=touched,
-                                extras={"summary": prod_summary,
-                                        "tree_retained": _prod_retained},
-                            ))
+                            wu_events.append(_prod_event)
                             # `+=`, not the `.` `append(` call other guard
                             # sites use: that exact call shape is what
                             # test_every_guard_refusal_records_into_the_refusal_ledger
