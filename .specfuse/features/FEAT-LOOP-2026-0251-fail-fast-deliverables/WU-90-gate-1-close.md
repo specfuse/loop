@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -16,7 +16,7 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_plan.py
     - specfuse/loop/loop.py
   reason: "Review fixes tested, full suite green, accept the generator risk"
-re_arm_count: 5
+re_arm_count: 6
 re_arm_history:
   -
     timestamp: 2026-11-26T13:30:05+00:00
@@ -53,6 +53,13 @@ re_arm_history:
     prior_cost_usd: 1.435437
     prior_duration_seconds: 478.949
     reason: "Fixed the deleted-file edge case, re-close it"
+  -
+    timestamp: 2026-11-26T17:35:20+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.347591
+    prior_duration_seconds: 616.642
+    reason: "Fixed renames, modes and non-ASCII names, re-close it"
 cumulative_cost_usd: 6.350473
 cumulative_duration_seconds: 1409.375
 cumulative_input_tokens: 236
@@ -125,3 +132,11 @@ the attempt deleted or reverted was missing from its retry note. Fixed on the br
 (`attempt_own_paths` in `loop.py`; tests in `TestTreeAndNote`; see `PLAN.md` Notes). Update the
 closing files in place as before, and say in `FOLLOW-UPS.md` whether #3613's re-run condition
 now holds.
+
+**Fifth re-close note (2026-11-26).** The fifth close recorded `not_met` on #3614: the retry
+note's path list missed renames, mode-only changes and non-ASCII names. Fixed on the branch by
+comparing each path's state at the start and end of the attempt (`snapshot_dirty_tree`,
+`attempt_own_paths` in `loop.py`; tests in `TestTreeAndNote`; see `PLAN.md` Notes). The
+`git add -N` crash on a new non-ASCII file predates this feature and is outside clause 4. Update
+the closing files in place as before, and say in `FOLLOW-UPS.md` whether #3614's re-run
+condition now holds.
