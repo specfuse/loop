@@ -130,3 +130,11 @@ gates:
   Accepted, not fixed: a deliverable that only a verification gate writes (a code generator, a
   formatter) is refused early on every attempt; `fail_fast_deliverables: false` is the remedy,
   and no in-loop test covers a gate-written deliverable.
+- **Third-close follow-up (2026-11-26, #3612).** With the tree kept, a later attempt's retry note
+  listed the earlier attempt's kept edits as its own, so "this attempt changed no files" never
+  showed after the first attempt. The driver now snapshots the content of every already-dirty path
+  when each attempt starts (`snapshot_dirty_tree`) and the note lists only paths that were clean
+  then or have changed since (`attempt_own_paths`). The guards' own diff and the events'
+  `files_touched` are unchanged, so `detect_deterministic_refusal_repeat` is unaffected. Tested in
+  `TestTreeAndNote` (kept edits left out, nothing-changed stated, a re-edited kept file listed),
+  both with and without `fail_fast_deliverables`.

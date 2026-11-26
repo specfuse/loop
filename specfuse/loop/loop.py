@@ -3101,6 +3101,40 @@ def untracked_paths() -> set[str]:
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
+def _path_digest(path: str) -> "str | None":
+    """SHA-256 of a file's bytes, or None when it is absent or unreadable."""
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def snapshot_dirty_tree(head_before: str) -> "dict[str, str | None]":
+    """Content digest of every path that already differs from *head_before*
+    when an attempt starts (#3612).
+
+    A refused attempt can keep its tree (`retain_on_guard_refusal`), so the
+    next attempt starts with the earlier attempt's edits on disk and the diff
+    its guards judge still names them. Taken before dispatch, this lets
+    `attempt_own_paths` tell those kept edits from what the attempt itself
+    changed.
+    """
+    return {p: _path_digest(p)
+            for p in git_diff_names(head_before, "HEAD", worktree=True)}
+
+
+def attempt_own_paths(changed: list,
+                      tree_before: "dict[str, str | None] | None") -> list:
+    """*changed* without the paths an earlier, kept attempt left that this
+    attempt did not touch again (#3612). A path counts as this attempt's when
+    it was clean at the start of the attempt or its contents have changed
+    since. With no snapshot, *changed* is returned unchanged."""
+    if not tree_before:
+        return list(changed)
+    return [p for p in changed
+            if p not in tree_before or _path_digest(p) != tree_before[p]]
+
+
 def ignored_paths() -> set[str]:
     """Repo-relative paths git reports as IGNORED, file by file.
 
@@ -5235,7 +5269,8 @@ def persist_attempt_notes(
 CHANGED_PATHS_NOTE_CAP = 20
 
 
-def format_changed_paths(wu: "WorkUnit", changed: list) -> str:
+def format_changed_paths(wu: "WorkUnit", changed: list,
+                         tree_before: "dict | None" = None) -> str:
     """The retry-note listing of what a refused attempt changed
     (FEAT-LOOP-2026-0251/T03).
 
@@ -5243,9 +5278,13 @@ def format_changed_paths(wu: "WorkUnit", changed: list) -> str:
     unit's file, `events.jsonl`, the progress note) is left out, as
     `assert_implementation_touched_files` leaves it out: the driver writes it
     on every attempt, so listing it would hide that the agent changed nothing.
+
+    *tree_before* is the attempt-start snapshot (`snapshot_dirty_tree`): paths
+    a kept earlier attempt left, unchanged since, are not this attempt's and
+    are left out (#3612).
     """
     paths = [
-        t for t in changed
+        t for t in attempt_own_paths(changed, tree_before)
         if Path(t).name not in (wu.file.name, "events.jsonl", PROGRESS_FILENAME)
     ]
     if not paths:
@@ -5259,6 +5298,7 @@ def format_changed_paths(wu: "WorkUnit", changed: list) -> str:
 
 def format_deliverable_missing_note(
     wu: "WorkUnit", summary: str, touched: "list | None", attempt: int,
+    tree_before: "dict | None" = None,
 ) -> str:
     """Compose the attempt note for a deliverable-presence refusal (#1412).
 
@@ -5320,7 +5360,7 @@ def format_deliverable_missing_note(
     lines += ["", "## Files this attempt touched", ""]
     lines.append(
         "(unknown — git could not name this attempt's diff)"
-        if touched is None else format_changed_paths(wu, touched))
+        if touched is None else format_changed_paths(wu, touched, tree_before))
     lines.append("")
     return "\n".join(lines)
 
@@ -11757,6 +11797,7 @@ def refuse_deliverable_missing(
     wu: WorkUnit, attempt: int, usage: dict, summary: str,
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
     untracked_before, verification_ran: bool, changed: "list[str] | None",
+    tree_before: "dict | None" = None,
 ) -> "tuple[str, dict]":
     """Settle the tree and build the record of a `deliverable_missing`
     refusal for either call site. Returns ``(note, event)``.
@@ -11767,7 +11808,8 @@ def refuse_deliverable_missing(
     # afterwards every declared path reads ABSENT and the note would lose the
     # one distinction it exists to record — which of the declared
     # deliverables the attempt did land (#1412).
-    note = format_deliverable_missing_note(wu, summary, changed, attempt)
+    note = format_deliverable_missing_note(wu, summary, changed, attempt,
+                                           tree_before=tree_before)
     if not verification_ran:
         note += _NOT_VERIFIED_NOTE
     note, retained = _resolve_guard_refusal_tree(
@@ -11791,13 +11833,14 @@ def refuse_no_deliverable_files(
     wu: WorkUnit, attempt: int, usage: dict, summary: str,
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
     untracked_before, verification_ran: bool, changed: "list[str] | None",
+    tree_before: "dict | None" = None,
 ) -> "tuple[str, dict]":
     """Settle the tree and build the record of a `no_deliverable_files`
     refusal for either call site. Returns ``(note, event)``."""
     note = summary
     if changed is not None:
         note += ("\n\nPaths this attempt changed:\n"
-                 + format_changed_paths(wu, changed))
+                 + format_changed_paths(wu, changed, tree_before))
     if not verification_ran:
         note += _NOT_VERIFIED_NOTE
     note, retained = _resolve_guard_refusal_tree(
@@ -11819,6 +11862,7 @@ def refuse_produces_not_in_diff(
     wu: WorkUnit, attempt: int, usage: dict, remaining: list[str],
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
     untracked_before, verification_ran: bool,
+    tree_before: "dict | None" = None,
 ) -> "tuple[str, str, dict]":
     """Settle the tree and build the record of a `produces_not_in_diff`
     refusal for either call site. Returns ``(summary, note, event)``."""
@@ -11827,7 +11871,7 @@ def refuse_produces_not_in_diff(
         note += _NOT_VERIFIED_NOTE
     excerpt = extract_failure_excerpt(note)
     note += ("\n\nPaths this attempt changed:\n"
-             + format_changed_paths(wu, touched))
+             + format_changed_paths(wu, touched, tree_before))
     note, retained = _resolve_guard_refusal_tree(
         cfg, head_before, events_path, untracked_before, note,
         failure_class="produces_not_in_diff",
@@ -13007,6 +13051,9 @@ def run(
                     if attempt > 1 and failure_note:
                         reason = failure_note.strip().splitlines()[0][:200]
                         print(f"   retry reason: {reason}")
+                    # What a kept earlier attempt left on disk, so this
+                    # attempt's retry note lists only its own changes (#3612).
+                    tree_before = snapshot_dirty_tree(head_before)
                     t0 = time.monotonic()
                     wu.last_gate_results = []
                     outcome, payload, usage = execute_unit_attempt(
@@ -13254,6 +13301,7 @@ def run(
                                 cfg=cfg, head_before=head_before,
                                 events_path=events_path,
                                 untracked_before=untracked_before,
+                                tree_before=tree_before,
                                 verification_ran=False,
                             ))
                         wu_events.append(_prod_event)
@@ -13280,6 +13328,7 @@ def run(
                             cfg=cfg, head_before=head_before,
                             events_path=events_path,
                             untracked_before=untracked_before,
+                            tree_before=tree_before,
                             verification_ran=False,
                             changed=payload["touched"],
                         )
@@ -13498,6 +13547,7 @@ def run(
                                     cfg=cfg, head_before=head_before,
                                     events_path=events_path,
                                     untracked_before=untracked_before,
+                                    tree_before=tree_before,
                                     verification_ran=True,
                                     changed=(git_diff_names(head_before, sha)
                                              if sha else []),
@@ -13537,6 +13587,7 @@ def run(
                                     cfg=cfg, head_before=head_before,
                                     events_path=events_path,
                                     untracked_before=untracked_before,
+                                    tree_before=tree_before,
                                     verification_ran=True,
                                     changed=touched,
                                 ))
@@ -13579,6 +13630,7 @@ def run(
                                     cfg=cfg, head_before=head_before,
                                     events_path=events_path,
                                     untracked_before=untracked_before,
+                                    tree_before=tree_before,
                                     verification_ran=True,
                                 ))
                             wu_events.append(_prod_event)

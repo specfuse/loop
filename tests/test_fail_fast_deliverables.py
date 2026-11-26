@@ -437,6 +437,81 @@ class TestTreeAndNote(_Case):
         self.assertIn("- `docs/other.md`", note)
         self.assertNotIn("verification did not run", note)
 
+    def _second_attempt_note(self, second_act, fail_fast: bool = True) -> str:
+        """`loop.run()` with a kept tree: attempt 1 writes `docs/notes.md`,
+        attempt 2 runs *second_act*. Returns the note recorded for attempt 2
+        (`work/<unit>/attempt-2.md`, written when the unit halts)."""
+        _, fdir = self._workspace()
+        dispatched = []
+        load = loop.load_verification
+
+        def load_cfg(*args, **kwargs):
+            cfg = dict(load(*args, **kwargs))
+            cfg["defaults"] = {"retain_on_guard_refusal": True,
+                               "fail_fast_deliverables": fail_fast}
+            return cfg
+
+        def dispatch(wu, note, cost_tracking=True):
+            if wu.body.startswith(loop._REPLAN_BRIEF_MARKER):
+                return "# T01\n\nRe-planned body.\n"
+            if wu.wu_id == T01:
+                dispatched.append(note)
+                if len(dispatched) == 1:
+                    Path("docs").mkdir(exist_ok=True)
+                    Path("docs/notes.md").write_text("notes\n")
+                elif len(dispatched) == 2:
+                    second_act()
+            return _COMPLETE
+
+        self._patch("load_verification", load_cfg)
+        self._patch("dispatch", dispatch)
+        self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+        self.assertEqual(loop.run(None, dry_run=False), 1)
+        for name, original in reversed(self._patches):
+            setattr(loop, name, original)
+        self._patches.clear()
+        return (fdir / "work" / T01.replace("/", "_") /
+                "attempt-2.md").read_text()
+
+    @staticmethod
+    def _path_list(note: str) -> str:
+        """The note's "Paths this attempt changed" list, without the retained
+        diff that follows it."""
+        return (note.split("Paths this attempt changed:\n", 1)[1]
+                .split("\n\n", 1)[0])
+
+    def test_kept_edits_of_an_earlier_attempt_are_not_listed(self):
+        # #3612: with the tree kept, the diff the guard judges still holds
+        # attempt 1's `docs/notes.md`; the note must list only what attempt 2
+        # itself changed.
+        def write_second():
+            Path("docs/second.md").write_text("second\n")
+
+        for fail_fast in (True, False):
+            with self.subTest(fail_fast=fail_fast):
+                note = self._second_attempt_note(write_second,
+                                                 fail_fast=fail_fast)
+                listed = self._path_list(note)
+                self.assertIn("- `docs/second.md`", listed)
+                self.assertNotIn("docs/notes.md", listed)
+
+    def test_later_attempt_that_changed_nothing_says_so(self):
+        for fail_fast in (True, False):
+            with self.subTest(fail_fast=fail_fast):
+                note = self._second_attempt_note(lambda: None,
+                                                 fail_fast=fail_fast)
+                listed = self._path_list(note)
+                self.assertIn("this attempt changed no files", listed)
+                self.assertNotIn("docs/notes.md", listed)
+
+    def test_editing_a_kept_file_again_lists_it(self):
+        def rewrite_notes():
+            Path("docs/notes.md").write_text("notes, revised\n")
+
+        note = self._second_attempt_note(rewrite_notes)
+        listed = self._path_list(note)
+        self.assertIn("- `docs/notes.md`", listed)
+
     def test_list_is_capped_at_twenty(self):
         def thirty():
             Path("docs").mkdir(exist_ok=True)
