@@ -43,6 +43,25 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-loop-2026-0251"></a>
+## FEAT-LOOP-2026-0251 — Refuse a missing deliverable before the verification gates run
+
+**Why.** Three driver refusals (`produces_not_in_diff`, `deliverable_missing`, `no_deliverable_files`) judge only the attempt's diff against `produces:`, yet run only after the full verification run has passed. An operator report measured 19 of 48 non-passing attempts (of 184) ending in one of them, and 6 of 26 escalations as `deterministic_refusal_repeat`.
+
+**Goal.** Those three refusals run before any verification gate (opt-out `defaults.fail_fast_deliverables: false`), their retry note lists the paths the attempt did change, and `specfuse lint` warns before arming when a `produces:` path appears nowhere in its unit's text. One gate, four units and a terminal close.
+
+**Out of scope.** Moving the smoke-import or closing-deliverable guards, changing repeat-refusal detection, live progress or halt notification, parallel gates or a result cache.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- On the next real feature run that hits one of the three refusals, confirm its
+  `attempt_outcome` carries `verify_seconds: 0` and no `gate_result` events (FEAT-LOOP-2026-0250
+  timings), i.e. the refusal really cost no gate run.
+- In a project whose gates generate tracked files, confirm `fail_fast_deliverables: false`
+  restores the old order.
+
 <a id="feat-loop-2026-0250"></a>
 ## FEAT-LOOP-2026-0250 — Record verification gate results and durations
 

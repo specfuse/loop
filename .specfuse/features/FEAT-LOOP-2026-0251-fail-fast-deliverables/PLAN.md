@@ -5,7 +5,7 @@ slug: fail-fast-deliverables
 branch: feat/FEAT-LOOP-2026-0251-fail-fast-deliverables
 roadmap_goal: An attempt whose declared deliverable is missing or untouched is refused before any verification gate runs, its retry note names the files it did change, and `specfuse lint` warns before arming when a `produces:` path appears nowhere in its unit's text.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 11.00
 ---
 
