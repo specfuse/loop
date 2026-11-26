@@ -2,7 +2,7 @@
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
 status: done
-verdict: met
+verdict: not_met
 attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 5.00

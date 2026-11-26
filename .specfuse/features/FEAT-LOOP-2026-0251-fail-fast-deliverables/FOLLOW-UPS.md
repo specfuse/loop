@@ -30,3 +30,10 @@ this session; the probe's case A agrees.
 2026-11-26, covers edits forced by moving code into a shared helper and by new lint wording.
 The ten changed modules pass (68 tests, exit 0), and the two edits are named in
 `RETROSPECTIVE.md`.
+
+### T03#1
+
+An attempt that changed nothing does not always say so. Under the default `retain_on_guard_refusal` (tree kept), attempt 1 writes `docs/notes.md` and is refused `produces_not_in_diff`. Attempt 2 writes nothing, yet its refusal note reads "Paths this attempt changed: - `docs/notes.md`" and not "this attempt changed no files". The list includes the retained edits of the earlier attempt, so definition-of-done clause 4 ("lists the paths this attempt changed, or says it changed none") does not hold. The same happens with `fail_fast_deliverables: false`. `test_attempt_that_changed_nothing_says_so` covers only a first attempt.
+
+- command: `HOME="$TMPDIR/judgehome" PYTHONPATH="$PWD:$TMPDIR/probe" python3 "$TMPDIR/probe/p.py"` (probe calls loop.run() with stubbed dispatch and verify, and prints each refusal note's path list; for both fail_fast True and False, attempt 2 printed `docs/notes.md`)
+- exit: 0
