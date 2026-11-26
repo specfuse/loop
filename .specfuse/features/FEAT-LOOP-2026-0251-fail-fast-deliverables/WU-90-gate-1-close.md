@@ -65,10 +65,10 @@ cumulative_duration_seconds: 2026.017
 cumulative_input_tokens: 280
 cumulative_output_tokens: 181754
 cumulative_attempts: 5
-cost_usd: 1.174106
+cost_usd: 1.657563
 duration_seconds: 747.309
-input_tokens: 46
-output_tokens: 34183
+input_tokens: 64
+output_tokens: 41536
 folded_through_re_arm: 6
 gate_set: plannext
 driver_version: 0.33.2
