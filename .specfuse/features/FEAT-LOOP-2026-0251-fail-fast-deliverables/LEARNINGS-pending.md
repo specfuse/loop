@@ -6,7 +6,7 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 # Lessons staged for promotion — FEAT-LOOP-2026-0251
 
 `autonomy_default: auto`, so `FEAT-LOOP-2026-0251/G1-CLOSE` may not append to
-`.specfuse/LEARNINGS.md` directly (`assert_learnings_staged_under_auto`). Two entries generalize.
+`.specfuse/LEARNINGS.md` directly (`assert_learnings_staged_under_auto`). Three entries generalize.
 
 ## Entries
 
@@ -25,3 +25,10 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
   lint output on the word "directory"; the new WARN contained it, the narrow tier passed,
   and the gate's broad run went red. The named module (`tests.test_lint_plan`) did not
   exist, so check that each module a unit names can be imported before arming.
+
+- [FEAT-LOOP-2026-0251/T03] **A "what this attempt changed" list cannot be a filter over the
+  diff against HEAD.** On a kept tree, a file the attempt deletes or restores leaves that
+  diff, and the list then says nothing changed. Compare the attempt-start and attempt-end
+  states over the union of their paths. Test write, edit, delete and revert on a second
+  attempt; a "changed nothing" test on a first attempt proves none of them.
+

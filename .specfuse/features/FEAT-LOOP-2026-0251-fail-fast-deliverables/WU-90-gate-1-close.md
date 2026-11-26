@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -46,19 +46,20 @@ re_arm_history:
     prior_cost_usd: 1.733084
     prior_duration_seconds: 379.569
     reason: "Trying to fix the last issue"
-cumulative_cost_usd: 3.181952
-cumulative_duration_seconds: 550.857
-cumulative_input_tokens: 118
-cumulative_output_tokens: 71498
-cumulative_attempts: 2
-cost_usd: 1.733084
-duration_seconds: 379.569
-input_tokens: 56
-output_tokens: 43124
-folded_through_re_arm: 3
+cumulative_cost_usd: 4.915036
+cumulative_duration_seconds: 930.426
+cumulative_input_tokens: 174
+cumulative_output_tokens: 114622
+cumulative_attempts: 3
+cost_usd: 1.079358
+duration_seconds: 478.949
+input_tokens: 48
+output_tokens: 30212
+folded_through_re_arm: 4
+verdict: not_met
 gate_set: plannext
 driver_version: 0.33.2
-started_at: 2026-11-26T15:32:04.468694+00:00
+started_at: 2026-11-26T16:17:14.747069+00:00
 ---
 
 # G1-CLOSE — terminal close

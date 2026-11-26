@@ -10,3 +10,5 @@
   - note: The operator must decide the one open FOLLOW-UPS.md entry (recommended: one general precedence rule in GATE-01.md, the close trigger and docs/methodology.md) and acknowledge the four consumer-visible changes; the re-run conditions for
 - **FEAT-LOOP-2026-0251/G1-CLOSE**: Updated the gate 1 close files for the third close after a fresh early-versus-late probe, recorded advisory verdict met, and extended one existing changelog fragment.
   - note: docs/methodology.md still says "What is refused does not change, only when", which is not true for a gate-written deliverable under the default (probe case Q).
+- **FEAT-LOOP-2026-0251/G1-CLOSE**: Fourth close of gate 1 records not_met because the retry note omits a kept file that a later attempt deleted or reverted, and can then say the attempt changed no files (clause 4); closing files updated in place.
+  - note: Fix by also listing attempt-start snapshot paths that left the diff and whose digest changed, with delete and revert tests; separately, a non-ASCII changed filename on a kept tree crashes git add -N, which also happens on the pre-feature loop.py.
