@@ -1,13 +1,30 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
 model: sonnet
 effort: high
+judge_edit_acknowledged:
+  paths:
+    - .specfuse/verification.yml.example
+    - produces_driver_helper
+    - specfuse/loop/data/verification.yml.example
+    - specfuse/loop/lint_plan.py
+    - specfuse/loop/loop.py
+  reason: "Review fixes tested, full suite green, accept the generator risk"
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-11-26T13:30:05+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 0.0
+    prior_duration_seconds: 0.0
+    reason: "Review fixes tested, full suite green, accept the generator risk"
 ---
 
 # G1-CLOSE — terminal close
