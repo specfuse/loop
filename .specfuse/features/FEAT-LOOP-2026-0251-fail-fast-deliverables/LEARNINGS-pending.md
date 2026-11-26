@@ -32,4 +32,6 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
   to a non-ASCII name (git quotes it, so the file cannot be opened) and mode changes.
   Compare attempt-start and attempt-end states over the union of their paths, read with
   `--no-renames -z`. Test write, edit, delete, revert, rename and a non-ASCII name on a
-  second attempt, and probe the whole matrix before the first fix, not one case per close.
+  second attempt, and probe the whole matrix before the first fix, not one case per close
+  (the state comparison closed the whole matrix at once; three filter fixes had not). When
+  switching git reads to `-z`, decide how a non-UTF-8 name decodes: quoting had hidden that.

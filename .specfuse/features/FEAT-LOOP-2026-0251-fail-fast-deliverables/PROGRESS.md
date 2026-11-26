@@ -14,3 +14,5 @@
   - note: Fix by also listing attempt-start snapshot paths that left the diff and whose digest changed, with delete and revert tests; separately, a non-ASCII changed filename on a kept tree crashes git add -N, which also happens on the pre-feature loop.py.
 - **FEAT-LOOP-2026-0251/G1-CLOSE**: Updated the gate 1 close files in place for the fifth close, with advisory verdict not_met because the retry note's path list still misses a renamed file's old name, later changes to kept non-ASCII-named files, a restore after an earlier rename, and mode-only changes (clause 4).
   - note: Build the retry note's list by comparing attempt-start and attempt-end path states (content and mode, read with --no-renames -z), and reuse the -z reading for the git add -N crash on non-ASCII names.
+- **FEAT-LOOP-2026-0251/G1-CLOSE**: Sixth close of gate 1 confirms the
+  - note: Weigh probe case N2 (a file named events.jsonl outside the feature folder is left out of the retry note); the non-UTF-8 decode in _paths_differing_from and the older git add -N crash have no filed issue.
