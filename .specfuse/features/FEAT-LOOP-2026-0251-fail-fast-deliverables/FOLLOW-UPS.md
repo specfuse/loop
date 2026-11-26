@@ -5,6 +5,8 @@ under "Resolved"; both re-run conditions now hold.
 
 ### The early refusal also outranks three other checks, and no precedence is stated for them
 
+**Tracked as #3610.**
+
 **Criterion (verbatim).** "A surviving skip, or an early refusal whose outcome or failure
 class differs from the late one for the same input, other than the deliverable-over-
 `files_changed_mismatch` precedence `GATE-01.md` states (#3608): record `not_met` with a
