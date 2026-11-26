@@ -26,9 +26,10 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
   and the gate's broad run went red. The named module (`tests.test_lint_plan`) did not
   exist, so check that each module a unit names can be imported before arming.
 
-- [FEAT-LOOP-2026-0251/T03] **A "what this attempt changed" list cannot be a filter over the
-  diff against HEAD.** On a kept tree, a file the attempt deletes or restores leaves that
-  diff, and the list then says nothing changed. Compare the attempt-start and attempt-end
-  states over the union of their paths. Test write, edit, delete and revert on a second
-  attempt; a "changed nothing" test on a first attempt proves none of them.
-
+- [FEAT-LOOP-2026-0251/T03] **A "what this attempt changed" list cannot be a filter over a
+  name-only diff.** On a kept tree it missed deletes and reverts, which leave the diff, and
+  after that fix it still missed a renamed file's old name (rename detection), later edits
+  to a non-ASCII name (git quotes it, so the file cannot be opened) and mode changes.
+  Compare attempt-start and attempt-end states over the union of their paths, read with
+  `--no-renames -z`. Test write, edit, delete, revert, rename and a non-ASCII name on a
+  second attempt, and probe the whole matrix before the first fix, not one case per close.

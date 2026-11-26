@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -53,19 +53,20 @@ re_arm_history:
     prior_cost_usd: 1.435437
     prior_duration_seconds: 478.949
     reason: "Fixed the deleted-file edge case, re-close it"
-cumulative_cost_usd: 4.915036
-cumulative_duration_seconds: 930.426
-cumulative_input_tokens: 174
-cumulative_output_tokens: 114622
-cumulative_attempts: 3
-cost_usd: 1.435437
-duration_seconds: 478.949
-input_tokens: 62
-output_tokens: 35593
-folded_through_re_arm: 4
+cumulative_cost_usd: 6.350473
+cumulative_duration_seconds: 1409.375
+cumulative_input_tokens: 236
+cumulative_output_tokens: 150215
+cumulative_attempts: 4
+cost_usd: 0.872732
+duration_seconds: 616.642
+input_tokens: 30
+output_tokens: 26181
+folded_through_re_arm: 5
 gate_set: plannext
 driver_version: 0.33.2
-started_at: 2026-11-26T16:17:14.747069+00:00
+started_at: 2026-11-26T16:51:24.709873+00:00
+verdict: not_met
 ---
 
 # G1-CLOSE — terminal close
