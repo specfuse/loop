@@ -2760,8 +2760,24 @@ def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
     # The report echoes the gate's own command as `$ <command>`; a command
     # that mentions FAIL in its text (a surefire grep fallback, say) would
     # otherwise be the excerpt's head and eat half its budget (#3293).
-    relevant = [ln for ln in stdout.splitlines()
-                if _KW.search(ln) and not ln.lstrip().startswith("$ ")]
+    lines = stdout.splitlines()
+    keep: set[int] = set()
+    for i, ln in enumerate(lines):
+        if _KW.search(ln) and not ln.lstrip().startswith("$ "):
+            keep.add(i)
+        # A gate that exited non-zero with no recognisable summary (#3603):
+        # its own last lines, which `select_gate_report_lines` put just above
+        # this note, are the failure reason even when no keyword matches them
+        # (an oracle's `RED: ...` lines). Walk back to the command echo.
+        if _NONZERO_EXIT_NOTE_RE.match(ln.strip()):
+            j = i - 1
+            while j >= 0:
+                prev = lines[j].strip()
+                if prev.startswith(("$ ", "### ")) or _FENCE_RE.match(prev):
+                    break
+                keep.add(j)
+                j -= 1
+    relevant = [lines[i] for i in sorted(keep)]
     # Hoist surefire failing-test lines to the front (#207): Maven emits
     # dozens of boilerplate [ERROR] wrapper lines that all pass the keyword
     # filter, so the head+tail budget reliably crowded out the actual
@@ -6644,8 +6660,26 @@ _NO_VERDICT_NOTE = (
     "only, and may be unrelated to the failure. Run the command directly."
 )
 
+#: Note for a command that exited non-zero with no recognisable summary
+#: (#3603). The exit code is the verdict, and the lines above it are the
+#: command's own last lines, so they are the failure reason, not noise. Worded
+#: without any `_FAILURE_KEYWORD_RE` keyword so the failure signature still
+#: keys off the command's own output, exactly as before.
+_NONZERO_EXIT_NOTE_PREFIX = "exit code "
+_NONZERO_EXIT_NOTE_RE = re.compile(r"^exit code -?\d+: ")
 
-def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
+
+def _nonzero_exit_note(returncode: int) -> str:
+    return (
+        f"{_NONZERO_EXIT_NOTE_PREFIX}{returncode}: the command exited non-zero "
+        "without a recognisable pass/fail summary — the lines above are the last "
+        "lines of its own output."
+    )
+
+
+def select_gate_report_lines(
+    out: "str | None", window: int = 15, returncode: "int | None" = None,
+) -> list[str]:
     """Return the lines to show in a gate's report — verdict first, tail always.
 
     A positional tail is not enough (FEAT-2026-0068). `unittest` writes its
@@ -6660,7 +6694,9 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
     (see `_VERDICT_RE`) found *before* the tail, with an explicit elision marker
     between the two so nothing is dropped silently. When no verdict is found
     anywhere, say so rather than presenting unrelated trailing output as though
-    it were the failure.
+    it were the failure — unless *returncode* is non-zero (#3603): then the exit
+    code is the verdict and the tail is the command's own account of it, so
+    the note names the exit code instead.
     """
     lines = (out or "").strip().splitlines()
     if not lines:
@@ -6693,6 +6729,8 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
     tail_verdict_re = _MAVEN_VERDICT_RE if maven else _VERDICT_RE
     if any(tail_verdict_re.search(ln.strip()) for ln in tail):
         return tail
+    if returncode:
+        return tail + [_nonzero_exit_note(returncode)]
     return tail + [_NO_VERDICT_NOTE]
 
 
@@ -6938,7 +6976,8 @@ def _run_gate_set(
             ok = proc.returncode == 0
             if _capture_returncodes is not None:
                 _capture_returncodes[gate["name"]] = proc.returncode
-            tail = select_gate_report_lines(out, window=15)
+            tail = select_gate_report_lines(
+                out, window=15, returncode=proc.returncode)
             # A green gate whose oracle silently degraded is a hollow pass
             # (issue #134): force FAIL and name the degradation honestly so the
             # log reads as "oracle couldn't measure it," not "code is clean."
