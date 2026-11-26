@@ -564,6 +564,74 @@ class TestTreeAndNote(_Case):
                 self.assertIn("- `docs/notes.md`", listed)
                 self.assertIn("- `docs/second.md`", listed)
 
+    # #3614: the list compares each path's state (content and mode) at the
+    # start and end of the attempt, reading git's names unquoted, so renames,
+    # mode-only changes and non-ASCII names are listed too.
+    CAFE = "docs/caf\u00e9.md"
+
+    def _listed(self, second_act, **kwargs) -> dict:
+        """The path list for attempt 2, per fail-fast setting."""
+        return {ff: self._path_list(self._second_attempt_note(
+                    second_act, fail_fast=ff, **kwargs))
+                for ff in (True, False)}
+
+    def test_rename_lists_both_names(self):
+        def rename():
+            os.rename("docs/old.md", "docs/new.md")
+
+        for ff, listed in self._listed(
+                rename, tracked={"docs/old.md": "old\n"}).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn("- `docs/old.md`", listed)
+                self.assertIn("- `docs/new.md`", listed)
+
+    def test_writing_back_a_renamed_file_lists_it(self):
+        def rename():
+            os.rename("docs/old.md", "docs/new.md")
+
+        def write_back():
+            Path("docs/old.md").write_text("old\n")
+
+        for ff, listed in self._listed(
+                write_back, first_act=rename,
+                tracked={"docs/old.md": "old\n"}).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn("- `docs/old.md`", listed)
+                self.assertNotIn("docs/new.md", listed)
+
+    def test_mode_only_change_lists_it(self):
+        def make_executable():
+            os.chmod("docs/notes.md", 0o755)
+
+        for ff, listed in self._listed(make_executable).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn("- `docs/notes.md`", listed)
+
+    def _edit_cafe(self, text):
+        return lambda: Path(self.CAFE).write_text(text)
+
+    def test_non_ascii_name_edited_again_is_listed(self):
+        for ff, listed in self._listed(
+                self._edit_cafe("second\n"), first_act=self._edit_cafe("first\n"),
+                tracked={self.CAFE: "original\n"}).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn(f"- `{self.CAFE}`", listed)
+
+    def test_non_ascii_name_restored_is_listed(self):
+        for ff, listed in self._listed(
+                self._edit_cafe("original\n"),
+                first_act=self._edit_cafe("first\n"),
+                tracked={self.CAFE: "original\n"}).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn(f"- `{self.CAFE}`", listed)
+
+    def test_non_ascii_name_left_alone_is_not_listed(self):
+        for ff, listed in self._listed(
+                lambda: None, first_act=self._edit_cafe("first\n"),
+                tracked={self.CAFE: "original\n"}).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn("this attempt changed no files", listed)
+
     def test_list_is_capped_at_twenty(self):
         def thirty():
             Path("docs").mkdir(exist_ok=True)

@@ -143,3 +143,11 @@ gates:
   "changed no files". `attempt_own_paths` now also lists every attempt-start snapshot path that
   is no longer in that diff and whose content has changed. Tested in `TestTreeAndNote` (deleted,
   reverted tracked edit, deleted plus a new file), with and without `fail_fast_deliverables`.
+- **Fifth-close follow-up (2026-11-26, #3614).** The list still missed renames, mode-only changes
+  and non-ASCII names, because each earlier fix filtered the guard's diff. It is now built by
+  comparison: every path that differs from the attempt's starting commit at its start or at the
+  refusal (`git diff --no-renames -z` plus untracked, read NUL-separated) is compared by state
+  (file type, executable bits, content digest) across the attempt. Tested in `TestTreeAndNote`
+  for each case, with and without `fail_fast_deliverables`; a non-ASCII kept edit left alone
+  still reads "changed no files". The driver crash on `git add -N` for a new non-ASCII file is a
+  separate, pre-existing defect (it predates this feature) and is not fixed here.

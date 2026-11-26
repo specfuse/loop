@@ -52,6 +52,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -3101,48 +3102,84 @@ def untracked_paths() -> set[str]:
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
-def _path_digest(path: str) -> "str | None":
-    """SHA-256 of a file's bytes, or None when it is absent or unreadable."""
+def _path_state(path: str) -> "tuple[int, str] | None":
+    """What a file is on disk, for telling whether an attempt changed it:
+    its type and executable bits (what git records of the mode) and a digest
+    of its bytes, or of its target for a symlink. None when it is absent or
+    unreadable."""
     try:
-        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        st = os.lstat(path)
+        if stat.S_ISLNK(st.st_mode):
+            data = os.readlink(path).encode()
+        else:
+            data = Path(path).read_bytes()
     except OSError:
         return None
+    return (stat.S_IFMT(st.st_mode) | (st.st_mode & 0o111),
+            hashlib.sha256(data).hexdigest())
 
 
-def snapshot_dirty_tree(head_before: str) -> "dict[str, str | None]":
-    """Content digest of every path that already differs from *head_before*
-    when an attempt starts (#3612).
+def _paths_differing_from(head: str) -> "set[str] | None":
+    """Every path whose working-tree state differs from *head*: tracked
+    changes, staged or not, by both their old and new names (no rename
+    pairing), plus untracked files. Names are read NUL-separated, so git
+    does not quote non-ASCII ones. None on any git error."""
+    try:
+        tracked = subprocess.run(
+            ["git", "diff", "--no-renames", "--name-only", "-z", head],
+            capture_output=True, text=True, check=True).stdout
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return {p for p in (tracked + untracked).split("\0") if p}
+
+
+@dataclass(frozen=True)
+class AttemptStart:
+    """The working tree as an attempt found it (#3612, #3614): the commit it
+    started from and the state of every path that already differed from it."""
+    head: str
+    states: dict
+
+
+def snapshot_dirty_tree(head_before: str) -> "AttemptStart | None":
+    """Record the tree before an attempt is dispatched.
 
     A refused attempt can keep its tree (`retain_on_guard_refusal`), so the
     next attempt starts with the earlier attempt's edits on disk and the diff
-    its guards judge still names them. Taken before dispatch, this lets
-    `attempt_own_paths` tell those kept edits from what the attempt itself
-    changed.
+    its guards judge still names them. `attempt_own_paths` compares this
+    record with the tree at the refusal to name what the attempt itself
+    changed. None when git cannot list the tree.
     """
-    return {p: _path_digest(p)
-            for p in git_diff_names(head_before, "HEAD", worktree=True)}
+    paths = _paths_differing_from(head_before)
+    if paths is None:
+        return None
+    return AttemptStart(head_before, {p: _path_state(p) for p in paths})
 
 
 def attempt_own_paths(changed: list,
-                      tree_before: "dict[str, str | None] | None") -> list:
-    """The paths this attempt changed, given *changed* (the diff the guard
-    judged) and the attempt-start snapshot (#3612).
+                      tree_before: "AttemptStart | None") -> list:
+    """The paths this attempt changed.
 
-    A path in *changed* counts when it was clean at the start of the attempt
-    or its contents have changed since; an earlier, kept attempt's edit the
-    attempt did not touch again is left out. A snapshot path that has left
-    *changed* because the attempt deleted it or reverted it to the committed
-    content counts too (#3613): it is not in the diff any more, but this
-    attempt changed it. With no snapshot, *changed* is returned unchanged.
+    Every path that differs from the attempt's starting commit now, or did
+    when the attempt started, is compared by state (`_path_state`) across the
+    attempt; a path clean at the start and dirty now changed in it. That
+    covers a kept earlier edit left alone (not listed, #3612), a kept file
+    deleted or reverted (listed, #3613), both names of a rename, a mode-only
+    change and non-ASCII names (#3614). *changed*, the diff the guard
+    judged, is used as is only when there is no snapshot or git cannot list
+    the tree now.
     """
-    if not tree_before:
+    if tree_before is None:
         return list(changed)
-    in_diff = set(changed)
-    own = [p for p in changed
-           if p not in tree_before or _path_digest(p) != tree_before[p]]
-    own += [p for p, digest in tree_before.items()
-            if p not in in_diff and _path_digest(p) != digest]
-    return own
+    now = _paths_differing_from(tree_before.head)
+    if now is None:
+        return list(changed)
+    before = tree_before.states
+    return [p for p in sorted(now | set(before))
+            if p not in before or _path_state(p) != before[p]]
 
 
 def ignored_paths() -> set[str]:
@@ -5280,7 +5317,7 @@ CHANGED_PATHS_NOTE_CAP = 20
 
 
 def format_changed_paths(wu: "WorkUnit", changed: list,
-                         tree_before: "dict | None" = None) -> str:
+                         tree_before: "AttemptStart | None" = None) -> str:
     """The retry-note listing of what a refused attempt changed
     (FEAT-LOOP-2026-0251/T03).
 
@@ -5308,7 +5345,7 @@ def format_changed_paths(wu: "WorkUnit", changed: list,
 
 def format_deliverable_missing_note(
     wu: "WorkUnit", summary: str, touched: "list | None", attempt: int,
-    tree_before: "dict | None" = None,
+    tree_before: "AttemptStart | None" = None,
 ) -> str:
     """Compose the attempt note for a deliverable-presence refusal (#1412).
 
@@ -11807,7 +11844,7 @@ def refuse_deliverable_missing(
     wu: WorkUnit, attempt: int, usage: dict, summary: str,
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
     untracked_before, verification_ran: bool, changed: "list[str] | None",
-    tree_before: "dict | None" = None,
+    tree_before: "AttemptStart | None" = None,
 ) -> "tuple[str, dict]":
     """Settle the tree and build the record of a `deliverable_missing`
     refusal for either call site. Returns ``(note, event)``.
@@ -11843,7 +11880,7 @@ def refuse_no_deliverable_files(
     wu: WorkUnit, attempt: int, usage: dict, summary: str,
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
     untracked_before, verification_ran: bool, changed: "list[str] | None",
-    tree_before: "dict | None" = None,
+    tree_before: "AttemptStart | None" = None,
 ) -> "tuple[str, dict]":
     """Settle the tree and build the record of a `no_deliverable_files`
     refusal for either call site. Returns ``(note, event)``."""
@@ -11872,7 +11909,7 @@ def refuse_produces_not_in_diff(
     wu: WorkUnit, attempt: int, usage: dict, remaining: list[str],
     touched: list[str], *, cfg: dict, head_before: str, events_path: Path,
     untracked_before, verification_ran: bool,
-    tree_before: "dict | None" = None,
+    tree_before: "AttemptStart | None" = None,
 ) -> "tuple[str, str, dict]":
     """Settle the tree and build the record of a `produces_not_in_diff`
     refusal for either call site. Returns ``(summary, note, event)``."""
