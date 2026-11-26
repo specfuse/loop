@@ -1,11 +1,12 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: not_met
 model: sonnet
 effort: high
 judge_edit_acknowledged:
@@ -25,6 +26,19 @@ re_arm_history:
     prior_cost_usd: 0.0
     prior_duration_seconds: 0.0
     reason: "Review fixes tested, full suite green, accept the generator risk"
+cumulative_cost_usd: 0.0
+cumulative_duration_seconds: 0.0
+cumulative_input_tokens: 0
+cumulative_output_tokens: 0
+cumulative_attempts: 0
+cost_usd: 1.256598
+duration_seconds: 291.43
+input_tokens: 56
+output_tokens: 29850
+folded_through_re_arm: 1
+gate_set: plannext
+driver_version: 0.33.2
+started_at: 2026-11-26T13:36:49.213745+00:00
 ---
 
 # G1-CLOSE — terminal close
