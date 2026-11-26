@@ -32,7 +32,7 @@ from unittest import mock
 
 from specfuse.loop import gate_eval, validate_event
 from tests._loop_loader import load_loop
-from tests._workspace import integration_workspace
+from tests._workspace import integration_workspace, with_deliverable
 
 loop = load_loop()
 
@@ -141,7 +141,7 @@ class ReplanEventEmissionTest(unittest.TestCase):
         with integration_workspace() as root:
             os.chdir(root)
             feature_dir = _scaffold(root)
-            self._patch("dispatch", fake_dispatch)
+            self._patch("dispatch", with_deliverable(fake_dispatch))
             self._patch("verify", fake_verify)
 
             rc = loop.run(None, dry_run=False)

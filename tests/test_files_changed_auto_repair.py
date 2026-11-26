@@ -152,8 +152,10 @@ class TestExecuteUnitAttemptAutoRepair(_GitRepoCase):
             "  - kept.py\n  - extra.py\n```\n"
         )
         outcome, payload, _usage = self._run(wu, stdout)
-        self.assertEqual(outcome, "files_changed_mismatch")
-        self.assertEqual(payload, ["extra.py"])
+        # FEAT-LOOP-2026-0251/T01: the untouched deliverable is now refused
+        # before verify(), so it never reaches the post-verify guard.
+        self.assertEqual(outcome, "produces_not_in_diff")
+        self.assertEqual(payload["remaining"], ["extra.py"])
         self.assertIsNone(wu.auto_repaired_files_changed)
 
     def test_nothing_to_repair_is_a_plain_pass(self):

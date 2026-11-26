@@ -183,6 +183,9 @@ class ReplanTerminatesTest(unittest.TestCase):
                     f"unit loop is spinning instead of terminating (a "
                     f"re-plan must spend the remaining attempt slot, not "
                     f"buy a new budget)")
+            # A deliverable, so each attempt reaches verify() rather than the
+            # early `no_deliverable_files` refusal.
+            Path("deliverable.txt").write_text(f"{dispatch_count['n']}\n")
             return "```result\nstatus: complete\n```\n"
 
         def fake_verify(wu, feature_dir, gate_file=None):
@@ -234,9 +237,9 @@ class RefusalRepeatOwnsOutcomeTest(unittest.TestCase):
         # the pass identically every time ("no_deliverable_files"), which
         # appends to `refusal_history` with empty `files_touched`. That is a
         # guard refusal, a structurally distinct code path from a real
-        # verify() failure: `should_replan_instead_of_retry` is only ever
-        # consulted on the "outcome == failed" path, so it is never reached
-        # here at all — the refusal-repeat check owns the outcome outright.
+        # verify() failure. An early refusal does consult the re-plan trigger
+        # (FEAT-LOOP-2026-0251), but only when it is not a repeat on an
+        # unmoved tree — so the refusal-repeat check owns the outcome outright.
         # `detect_deterministic_refusal_repeat` fires at the top of attempt 3
         # once 2 identical refusals (from attempts 1 and 2) exist, blocking
         # BEFORE attempt 3 is ever dispatched: proven directly by

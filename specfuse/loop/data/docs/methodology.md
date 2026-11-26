@@ -454,9 +454,9 @@ bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 | `zero_token_skip` | the session produced no tokens; nothing ran |
 | `files_changed_mismatch` | RESULT declared paths that show no diff |
 | `closing_deliverable_missing` | a closing-WU guard refused (see `close-discipline.md` §4) |
-| `deliverable_missing` | a declared `produces:` path is absent |
-| `no_deliverable_files` | the squash names only the WU file / events |
-| `produces_not_in_diff` | `produces:` path exists but is not in the squash, and the RESULT's `produces_unchanged:` did not justify it |
+| `deliverable_missing` | a declared `produces:` path is absent; refused before verification unless `defaults.fail_fast_deliverables: false` |
+| `no_deliverable_files` | the squash names only the WU file / events; refused before verification unless `defaults.fail_fast_deliverables: false` |
+| `produces_not_in_diff` | `produces:` path exists but is not in the squash, and the RESULT's `produces_unchanged:` did not justify it; refused before verification unless `defaults.fail_fast_deliverables: false` |
 | `squash_commit_failed` | `git commit` for the squash was rejected |
 | `smoke_import_failed` | a declared smoke-import line failed post-squash |
 | `learnings_not_staged` | a closing WU under `autonomy_default: auto` touched `.specfuse/LEARNINGS.md` directly instead of staging to `LEARNINGS-pending.md` (FEAT-2026-0053/T09) |
@@ -506,6 +506,23 @@ consumer that queries only those concludes the record is empty when it is not.
 **Read every field in that table before concluding a record is undiagnosable.**
 A cross-repo audit reported three separate "missing diagnostic" findings that
 were all query errors against this contract, none of which existed (#270).
+
+**Presence refusals run before verification (FEAT-LOOP-2026-0251).**
+`produces_not_in_diff`, `deliverable_missing` and `no_deliverable_files` judge
+only the attempt's diff against `produces:`, so the driver decides them before
+any verification gate runs, and a refused attempt pays for no gate. Setting
+`defaults.fail_fast_deliverables: false` in `verification.yml` restores the old
+order, in which they run only after verification passes. What is refused does
+not change, only when. The retry note for these refusals also lists the paths
+the attempt did change. `specfuse lint` warns before arming when a unit's body
+never mentions a `produces:` path (full path, file name or parent directory).
+A deliverable refusal takes precedence over every check that runs after the
+agent session: on an attempt that also fails a gate, `files_changed_mismatch`,
+the smoke-import guard, the blocked-verdict guard or a closing-deliverable
+guard, only the deliverable refusal is recorded, and the other check runs on a
+later attempt. Because the early refusal follows `retain_on_guard_refusal`, such
+an attempt keeps its tree by default where the smoke-import and
+closing-deliverable refusals would have reset it.
 
 **Retain-and-repair (FEAT-2026-0103).** `files_changed_mismatch`,
 `produces_not_in_diff`, `deliverable_missing`, and `no_deliverable_files` —

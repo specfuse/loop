@@ -29,6 +29,7 @@ Usage:  specfuse lint .specfuse/features/FEAT-XXXX-slug
 from __future__ import annotations
 
 import fnmatch
+import os
 import re
 from pathlib import Path
 
@@ -1038,6 +1039,50 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
                 f"touch it. This warning is advisory either way and does not "
                 f"clear: nothing here reads the body."
             )
+
+
+def check_produces_mentioned(feature_dir: Path, gates: list) -> None:
+    """WARN when a dispatchable WU's body never mentions a `produces:` path.
+
+    A session told nothing about a declared path tends not to touch it, and
+    the driver then refuses the attempt (`produces_not_in_diff`). A mention is
+    the full path, the file name, or the parent directory. The parent
+    directory is accepted because matching only path or file name fired on
+    81 of 401 `done` units here (20.2%); with it, 35 (8.7%). Dispatchable
+    means any status but `done` / `abandoned`. WARN-only. See
+    FEAT-LOOP-2026-0251/T04.
+    """
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, body = read_frontmatter(wpath)
+            if wfm.get("status") in ("done", "abandoned"):
+                continue
+            produces_raw = wfm.get("produces")
+            if not produces_raw:
+                continue
+            raw_entries = (
+                produces_raw if isinstance(produces_raw, list) else [produces_raw]
+            )
+            for p in raw_entries:
+                p_s = str(p).strip()
+                if not p_s:
+                    continue
+                needles = (p_s, os.path.basename(p_s), os.path.dirname(p_s))
+                if any(n and n in body for n in needles):
+                    continue
+                print(
+                    f"WARN: {wfile}: {wid} declares produces path {p_s!r}, but "
+                    f"its body names neither the path, its file name nor its "
+                    f"directory. An attempt that leaves it untouched is refused "
+                    f"after the session with produces_not_in_diff. Name the "
+                    f"path in the body, or drop it from produces:."
+                )
 
 
 # Ceremony-proportionality threshold (docs/methodology.md §6): one fact, one
@@ -2276,6 +2321,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     # as detecting-a-condition-is-not-handling-it.
     errs.extend(check_convergent_wu_wiring(feature_dir, fm, gates))
     check_produces_satisfiability(feature_dir, gates)
+    check_produces_mentioned(feature_dir, gates)
     lint_gate_proportionality(feature_dir, gates)
     errs.extend(check_produces_shape(feature_dir, gates))
     errs.extend(check_judge_edit_acknowledged(feature_dir, gates))

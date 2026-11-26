@@ -100,7 +100,7 @@ class TestDetectDeterministicRefusalRepeat(unittest.TestCase):
         # that is what the next attempt is handed.
         import inspect
         src = inspect.getsource(loop_module.run)
-        branch = src[src.index('"deliverable_missing",'):]
+        branch = src[src.index("if not deliv_ok:"):]
         branch = branch[:branch.index("continue")]
         self.assertIn("failure_note = _deliv_note", branch)
         self.assertNotIn("failure_note = deliv_summary", branch)

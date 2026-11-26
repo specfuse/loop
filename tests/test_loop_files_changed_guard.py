@@ -308,7 +308,7 @@ class TestFilesChangedMismatchSpinsIntegration(unittest.TestCase):
                 # trigger 3 case (sentinel path the agent never touched).
                 return True, "(stub verify pass)"
 
-            self._patch("dispatch", fake_dispatch)
+            self._patch("dispatch", with_deliverable(fake_dispatch))
             self._patch("verify", fake_verify)
 
             rc = loop.run(None, dry_run=False)
