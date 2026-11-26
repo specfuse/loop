@@ -11,10 +11,12 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 ## Entries
 
 - [FEAT-LOOP-2026-0251/T01] **A unit that moves a guard earlier must state which refusal wins
-  when two apply, for every guard it now runs ahead of.** "Change only when, not what" is
-  not satisfiable on its own: moving `produces_not_in_diff` before `verify()` also moved it
-  ahead of `files_changed_mismatch`, which changed the recorded outcome for an input both
-  guards refuse. List the overtaken guards and the intended precedence in the plan.
+  when two apply, for every check it now runs ahead of.** Moving `produces_not_in_diff`
+  before `verify()` also moved it ahead of `files_changed_mismatch`, the blocked-verdict
+  check, the smoke-import check and the closing-deliverable guards. The plan named none. The
+  amendment after the first close named one, and the re-close failed on the others. List
+  every overtaken check, probe each one early against late, and put the whole list in one
+  follow-up; a "read in the code" aside does not reach the operator's decision.
 
 - [FEAT-LOOP-2026-0251/T04] **A unit that adds a lint message must run every test module
   that lints, not only the ones its Verification section names.** Existing tests filtered
