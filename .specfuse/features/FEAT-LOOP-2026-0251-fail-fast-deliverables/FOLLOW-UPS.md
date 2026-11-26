@@ -5,6 +5,8 @@ Fourth close, 2026-11-26. One entry is open, below. The re-run conditions of #36
 
 ### T03#1 — a kept file that an attempt deletes or reverts is missing from its retry note
 
+**Tracked as #3613.**
+
 **Criterion** (`GATE-01.md`, clause 4): "**Tree and note.** An early refusal keeps or resets
 the tree per `defaults.retain_on_guard_refusal`, as the late refusal does; its retry note
 states that verification did not run and lists the paths this attempt changed (or says it
