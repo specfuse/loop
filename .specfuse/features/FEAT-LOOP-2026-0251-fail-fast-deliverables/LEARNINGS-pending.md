@@ -16,7 +16,9 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
   check, the smoke-import check and the closing-deliverable guards. The plan named none. The
   amendment after the first close named one, and the re-close failed on the others. List
   every overtaken check, probe each one early against late, and put the whole list in one
-  follow-up; a "read in the code" aside does not reach the operator's decision.
+  follow-up; a "read in the code" aside does not reach the operator's decision. Prefer one general rule
+  over a list of named exceptions: here a list cost a second re-close. Also name what else the
+  order changes besides the label, such as whether the tree is kept or reset.
 
 - [FEAT-LOOP-2026-0251/T04] **A unit that adds a lint message must run every test module
   that lints, not only the ones its Verification section names.** Existing tests filtered

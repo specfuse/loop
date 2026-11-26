@@ -8,3 +8,5 @@
   - note: Operator must decide whether a deliverable refusal takes precedence over files_changed_mismatch (see FOLLOW-UPS.md) and acknowledge the four consumer-visible changes.
 - **FEAT-LOOP-2026-0251/G1-CLOSE**: Re-ran the terminal close with advisory verdict not_met, because probes show the early deliverable refusal also yields a different outcome or failure class than the late order for smoke-import, blocked-verdict and closing-deliverable inputs, which the stated files_changed_mismatch precedence does not cover.
   - note: The operator must decide the one open FOLLOW-UPS.md entry (recommended: one general precedence rule in GATE-01.md, the close trigger and docs/methodology.md) and acknowledge the four consumer-visible changes; the re-run conditions for
+- **FEAT-LOOP-2026-0251/G1-CLOSE**: Updated the gate 1 close files for the third close after a fresh early-versus-late probe, recorded advisory verdict met, and extended one existing changelog fragment.
+  - note: docs/methodology.md still says "What is refused does not change, only when", which is not true for a gate-written deliverable under the default (probe case Q).

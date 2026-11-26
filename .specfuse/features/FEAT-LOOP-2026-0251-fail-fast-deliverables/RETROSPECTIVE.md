@@ -4,16 +4,17 @@
 
 ## Verdict
 
-`not_met` (advisory; the judge concludes). This is the second close of the gate. The two
-`not_met` findings of the first close (#3608, #3609) are settled by the operator's amendment
-to the definition of done. The close unit's escalation trigger still fires on inputs the
-amendment does not name: four probed inputs get a different early and late refusal outcome,
-and none of them involves `files_changed_mismatch`. `FOLLOW-UPS.md` states the decision.
+`met` (advisory; the judge concludes). This is the third close of the gate. #3608, #3609 and
+#3610 are settled by the operator's two amendments to `GATE-01.md`. A fresh probe found no
+early-against-late difference other than a deliverable refusal winning over a later check or
+a verification gate. One limit of that reading: when a gate itself writes the declared file
+(probe case Q), there is no late refusal at all. `PLAN.md` decision 6 designed the opt-out
+for that case. Two wording gaps are listed under "Notes for the human reviewer".
 
 ## Measurements
 
-All commands ran fresh in this session on the working tree. Runs that drive `loop.run()` used
-`HOME` under `$TMPDIR`, because the sandbox blocks writes to the real session directory.
+All commands ran fresh in this third close on the working tree. Runs that drive `loop.run()`
+used `HOME` under `$TMPDIR`, because the sandbox blocks writes to the real session directory.
 
 ### feature_oracle: PASS
 
@@ -25,62 +26,88 @@ of that file for `unittest.skip`, `skipIf`, `skipUnless`, `skipTest` and `@skip`
 
 | Check | Result |
 |---|---|
-| `python3 -m unittest tests.test_dispatch_skeleton tests.test_gate_timings -b` | exit 0, 25 tests |
+| `python3 -m unittest tests.test_dispatch_skeleton tests.test_gate_timings -b` | 25 tests, `OK` |
 | `python3 -m unittest tests.test_lint_plan -b` (named by T04) | **error: no such module** |
-| the six `tests/test_lint_plan*.py` modules that do exist | exit 0, 46 tests |
-| the ten changed pre-existing test modules | exit 0, 68 tests |
+| the six `tests/test_lint_plan*.py` modules that do exist | 46 tests, `OK` |
+| the ten changed pre-existing test modules | 68 tests, `OK` |
 | `.specfuse/scripts/lint_plan.py` over every feature folder with a `PLAN.md` | 97 linted, 0 non-zero exits |
 | `diff` of `verification.yml.example` against its packaged copy | exit 0, empty |
 | `diff docs/methodology.md specfuse/loop/data/docs/methodology.md` | exit 0, empty |
 | `python3 -m specfuse.loop.changelog_fragments check` | exit 0 |
 
 This session did not run the full suite or coverage. The driver's broad run recorded at
-2026-11-26T13:59:19Z has `ok: true` and no failing gate. The newest tests log in
-`work/gate-logs/` (stamp `20261126T135837`) shows `Ran 5144 tests`, `OK (skipped=4)`. The
+2026-11-26T15:32:03Z has `ok: true` and no failing gate. Its tests log
+(`work/gate-logs/`, stamp `20261126T153058`) shows `Ran 5144 tests`, `OK (skipped=4)`; the
 coverage log of the same run shows 92% total.
 
-### Mutation control
+### Controls: the oracle observes the feature
 
-With `resolve_fail_fast_deliverables` forced to return `False`, 13 of the 30 oracle tests
-fail, with no errors: `TestOptOut` (4, including the resolver's own default test),
-`TestPresenceEarly` (3), `TestProducesNotInDiffEarly` (3), `TestTreeAndNote` (2) and
-`TestEarlyRefusalRecovery` (1). So these classes observe the new order.
-`TestArmTimeWarning` was not part of this control. No unit's "fails on HEAD" claim was
-re-run against a pre-feature tree.
+**Opt-out mutation.** With `resolve_fail_fast_deliverables` forced to return `False`, 13 of
+the 30 oracle tests fail, with no errors: `TestOptOut` 4, `TestPresenceEarly` 3,
+`TestProducesNotInDiffEarly` 3, `TestTreeAndNote` 2, `TestEarlyRefusalRecovery` 1.
+
+**Pre-feature driver.** A scratch copy of the current package and tests, with `loop.py`
+replaced by the one in the pinned build `bd7e508` (cut before T01; it contains no
+`fail_fast_deliverables`). This is not a full pre-feature tree.
+
+| Class | Tests run | Result on the old driver |
+|---|---|---|
+| `TestProducesNotInDiffEarly` | 6 | 6 errors: 5 unknown argument `untracked_before`, 1 missing `early_produces_refusal` |
+| `TestPresenceEarly` | 3 | 3 errors: unknown argument `untracked_before` |
+| `TestOptOut` | 4 | 3 assertion failures (`1 != 0`), 1 missing resolver |
+| `TestTreeAndNote` | 6 | 7 assertion failures (subtests counted) |
+
+The errors in the first two rows show a missing interface, not wrong behaviour. The mutation
+control above is the behaviour evidence for those two classes. For `TestArmTimeWarning`,
+with `check_produces_mentioned` replaced by a no-op, 2 of 6 tests fail (the other four expect
+silence).
 
 ### Early against late, same input
 
 A throwaway probe drove `loop.run()` over the oracle's fixture and read the first
-`attempt_outcome` for T01, once with `fail_fast_deliverables` `true` and once `false`.
-Verification is a stub. The unit declares `src/rule.py`. Unless the row says otherwise, the
-attempt writes only `docs/notes.md`, the RESULT is plain and the stub passes. Each cell is
-outcome / failure class. Every `true` run had `verify_seconds: 0`.
+`attempt_outcome` for T01, once with fail-fast on and once off (the resolver patched).
+Verification is a stub. The unit declares `src/rule.py`. "Untouched" means the attempt
+writes only `docs/notes.md`. Each cell is outcome / failure class. Every early deliverable
+refusal recorded `verify_seconds: 0`.
 
-| Case | `true` | `false` | Same | Named precedence |
-|---|---|---|---|---|
-| A: RESULT claims `src/rule.py` in `files_changed` | `produces_not_in_diff` / `produces_not_in_diff` | `files_changed_mismatch` / `files_changed_mismatch` | no | yes (#3608) |
-| B: the verify stub fails | `produces_not_in_diff` / `produces_not_in_diff` | `failed` / `other` | no | no |
-| C: control | `produces_not_in_diff` / `produces_not_in_diff` | same | yes | — |
-| D: unit body has a failing smoke-import line | `produces_not_in_diff` / `produces_not_in_diff` | `smoke_import_failed` / `smoke_import_failed` | **no** | **no** |
-| E: also declares `docs/report.md`; attempt writes it with a `BLOCKED` verdict heading | `produces_not_in_diff` / `produces_not_in_diff` | `failed` / `guard_refusal` | **no** | **no** |
-| F: the same unit typed `close` | `produces_not_in_diff` / `produces_not_in_diff` | `closing_deliverable_missing` / `guard_refusal` | **no** | **no** |
-| G: attempt empties `src/rule.py`; failing smoke-import line | `deliverable_missing` / `guard_refusal` | `smoke_import_failed` / `smoke_import_failed` | **no** | **no** |
+| Case | fail-fast on | fail-fast off | Differs because |
+|---|---|---|---|
+| A: RESULT claims `src/rule.py` in `files_changed` | `produces_not_in_diff` | `files_changed_mismatch` | outranks a later guard |
+| B: verify stub fails, untouched | `produces_not_in_diff` | `failed` / `tests` | outranks a gate |
+| C: untouched, nothing else wrong | `produces_not_in_diff` | same | same |
+| D: failing smoke-import line, untouched | `produces_not_in_diff` | `smoke_import_failed` | outranks a later guard |
+| E: also declares `docs/report.md`, written with a `BLOCKED` verdict heading; untouched | `produces_not_in_diff` | `failed` / `guard_refusal` | outranks a later guard |
+| F: unit typed `close`, untouched | `produces_not_in_diff` | `closing_deliverable_missing` / `guard_refusal` | outranks a later guard |
+| G: failing smoke-import line, `src/rule.py` emptied | `deliverable_missing` / `guard_refusal` | `smoke_import_failed` | outranks a later guard |
+| H: squash commit rejected (stub), untouched | `produces_not_in_diff` | `squash_commit_failed` | outranks a later check |
+| I: failing smoke-import line, nothing written | `no_deliverable_files` / `guard_refusal` | `smoke_import_failed` | outranks a later guard |
+| J: `close` unit, nothing written | `produces_not_in_diff` | `closing_deliverable_missing` / `guard_refusal` | outranks a later guard |
+| K: verify stub fails, nothing written | `no_deliverable_files` / `guard_refusal` | `failed` / `tests` | outranks a gate |
+| P: squash commit rejected (stub), `src/rule.py` emptied | `deliverable_missing` / `guard_refusal` | `squash_commit_failed` | outranks a later check |
+| L: nothing written (two deliverable refusals apply) | `no_deliverable_files` / `guard_refusal` | same | same |
+| M: only `src/rule.py` deleted (two apply) | `deliverable_missing` / `guard_refusal` | same | same |
+| N: zero-token session, untouched | `zero_token_skip` | same | same |
+| O: RESULT `status: blocked`, untouched | `blocked` | same | same |
+| Q: verify stub writes `src/rule.py`; the attempt did not | `produces_not_in_diff` | `passed` | outranks a gate; no late refusal exists |
 
-Positive controls with `fail_fast` `true` and every declared path changed: the D unit gets
-`smoke_import_failed`, and the E unit gets `failed` / `guard_refusal`. So the second check
-in D and E fires on its own. F has no separate control; its `false` run shows the closing
-guard firing. F needs a `close` unit that declares `produces:`.
+Where a failure class is not shown, it equals the outcome name. With every declared path
+changed and fail-fast on, the D, E, F and H units get the same record as with it off
+(`smoke_import_failed`; `failed` / `guard_refusal`; `closing_deliverable_missing`;
+`squash_commit_failed`). So each second check fires on its own.
 
-A, D, E, F and G are each refused under both orders. Only the reported refusal differs.
-B is not a second refusal guard: a gate that never runs cannot report a failure, which is
-what the feature is for. D to G each trip two refusals. `GATE-01.md` limits clause 3 to
-inputs that trip one, so clause 3 is not contradicted. The same file names a precedence only
-over `files_changed_mismatch`, and the close unit's trigger exempts only that one.
+H and P are new in this close. In the first run of the probe, M and the retained-tree
+deletion case raised `FileNotFoundError` in both orders: the probe's stub deleted an
+already-deleted file on attempt 2. The stub was fixed and those rows rerun.
 
-Read in `loop.py`, not measured: the late smoke-import and closing-deliverable refusals call
-`reset_preserving_events` without consulting `retain_on_guard_refusal`. The early refusal
-follows that key, which defaults to keeping the tree. So for D, F and G the tree handling
-should differ too.
+### Tree handling, measured at the start of attempt 2
+
+- **Early presence refusals** (`deliverable_missing` for an emptied and for a deleted file,
+  `no_deliverable_files` with nothing written): with `retain_on_guard_refusal` true, both
+  orders record `tree_retained: true`; where the attempt had changed something, the change
+  was still there. With it false, both record `tree_retained: false`, and for the two
+  `deliverable_missing` inputs the tree was reset.
+- **Overtaken checks:** in D, E, F, G, H, P and B the fail-fast run kept the attempt's
+  `docs/notes.md`, and the other order had removed it.
 
 ### Per-criterion results
 
@@ -89,17 +116,17 @@ because it is not one of this unit's permitted closing surfaces.
 
 | Criterion | Result | Evidence |
 |---|---|---|
-| T01#1 | passes now | `TestProducesNotInDiffEarly`, in the oracle run; "fails on HEAD" not re-run |
+| T01#1 | passes | `TestProducesNotInDiffEarly`; on the old driver errors only, behaviour shown by the mutation control |
 | T01#2 | passes | `test_early_record_equals_late_record` (plain RESULT, passing stub) |
-| T01#3 | passes | 25 tests, exit 0 |
-| T02#1 | passes now | `TestPresenceEarly`; "fails on HEAD" not re-run |
-| T02#2 | passes now | `TestOptOut`; "fails on HEAD" not re-run |
+| T01#3 | passes | 25 tests, `OK` |
+| T02#1 | passes | `TestPresenceEarly`; on the old driver errors only, behaviour shown by the mutation control |
+| T02#2 | passes | `TestOptOut`; 3 assertion failures on the old driver |
 | T02#3 | passes | empty diff |
-| T03#1 | passes now | `TestTreeAndNote`; "fails on HEAD" not re-run |
+| T03#1 | passes | `TestTreeAndNote`; assertion failures on the old driver |
 | T03#2 | passes | `test_list_is_capped_at_twenty` |
-| T04#1 | passes now | `TestArmTimeWarning`; "fails on HEAD" not re-run |
-| T04#2 | passes with the repository script | 97 folders, 0 non-zero exits; the installed `specfuse` command was not used |
-| T04#3 | not observed | this session did not see T04's RESULT; the count is re-measured below |
+| T04#1 | passes | `TestArmTimeWarning`; no-op control |
+| T04#2 | passes with the repository script | 97 folders, 0 non-zero exits; the installed `specfuse` warns it is a different build |
+| T04#3 | not observed | no close has seen T04's RESULT; the count is re-measured below |
 | T04#4 | passes | empty diff |
 | T04#5 | passes | prints `0` |
 
@@ -111,17 +138,24 @@ carried forward: 0 criteria, re-measured: 13
 |---|---|---|
 | 1. `produces_not_in_diff` early | Refused with 0 `verify_fn` calls, `verify_seconds` 0, no attempt-phase `gate_result`; a changed path verifies once and passes; a justified path still verifies; class, signature and summary equal the late site's | `TestProducesNotInDiffEarly` (6 tests) |
 | 2. Presence early | Absent, empty and bookkeeping-only diffs are refused with 0 calls | `TestPresenceEarly` (3) |
-| 3. Opt-out | With the key `false`, each of the three cases verifies once; outcome, class, signature and summary equal the default's, for inputs that trip one refusal | `TestOptOut` (4), on plain-RESULT, passing-stub inputs |
-| 4. Tree and note | Note says verification did not run and lists changed paths or says none; cap of 20 plus a count; tree kept or reset | `TestTreeAndNote` (6). The kept/reset assertions use `produces_not_in_diff` only; no test asserts tree handling for an early presence refusal |
+| 3. Opt-out | With the key `false`, each of the three cases verifies once; outcome, class, signature and summary equal the default's, for inputs that trip one refusal | `TestOptOut` (4), on plain-RESULT, passing-stub inputs; probe cases C, L, M |
+| 4. Tree and note | Note says verification did not run and lists changed paths or says none; cap of 20 plus a count; tree kept or reset | `TestTreeAndNote` (6). The kept/reset test assertions use `produces_not_in_diff` only. No test asserts tree handling for an early presence refusal; this close measured it by probe |
 | 5. Arm-time WARN | Warns on an unmentioned path; silent on full path, file name or parent directory, and on `done` / `abandoned`; `lint()` calls it | `TestArmTimeWarning` (6) |
 | 6. Nothing else changes | Holds as widened for #3609. See the list below | `diff -ru` of `tests/` against the recorded base; the ten modules pass |
-| Precedence over `files_changed_mismatch` | Both sides asserted | `test_deliverable_refusal_outranks_files_changed_mismatch`; probe case A |
+| Precedence over every later check | Holds on every probed pair. A test asserts only the `files_changed_mismatch` pair | `test_deliverable_refusal_outranks_files_changed_mismatch`; probe cases A, B, D to K, P |
 
 Three review fixes made before the first close, outside any work unit, are covered by
 `TestEarlyRefusalRecovery` (3: re-plan still fires; uncommitted tracked edits count as a
 moved tree; an untouched tree still halts) and `TestEarlyRetainedNoteWording` (2).
 
 ## Pre-existing tests changed
+
+This third close ran no git command and did not repeat the tree comparison. Instead it
+listed files under `tests/`, `specfuse/`, `scripts/` and `.specfuse/scripts/` modified after
+the second close wrote this file. The only one is the packaged copy
+`specfuse/loop/data/docs/methodology.md`. No test or Python source is newer, so the second
+close's comparison, below, still describes the tree (a modification-time check, not a
+content diff). The ten modules were rerun in this session.
 
 Compared against the public tarball of `a89373d119f8e2d8003a8956dbd4bd27dde8057f`, the
 merge base recorded on the first close's `judged` event, and against public `main` as
@@ -167,74 +201,97 @@ this unit. The first close had noted the other overtaken checks from reading the
 did not probe them or put them in a follow-up entry, so the amendment named only one. This
 close probed them (cases D to G).
 
+The second close (2026-11-26T14:10Z) and the judge recorded `not_met`, and the driver filed
+#3610. The operator replaced the single named exception with a general precedence rule in
+`GATE-01.md`, the close unit's trigger and `docs/methodology.md`, and re-armed this unit.
+No source or test change accompanied it.
+
 T04 passed although its Verification section names `tests.test_lint_plan`, which does not
 exist.
 
 ## Cost analysis
 
-Unit costs are from the `task_completed` events in `events.jsonl`.
+Unit costs are from the `task_completed` events in `events.jsonl`. For a close, the figure
+includes its judge: `record_judge_cost_fold` adds the judge's usage to the attempt before
+`attempt_outcome` is emitted.
 
-| Unit | Planned USD | Actual USD | Actual / planned | Attempts |
-|---|---|---|---|---|
-| T01 | 2.00 | 0.88 | 44% | 1 |
-| T02 | 1.50 | 0.77 | 51% | 1 |
-| T03 | 1.00 | 0.55 | 55% | 1 |
-| T04 | 1.50 | 0.47 | 32% | 1 |
-| Substantive total | 6.00 | 2.67 | 45% | 4 |
-| G1-CLOSE, first close | 5.00 | 1.69 | 34% | 1 |
-| G1-CLOSE, this re-close | (same plan line) | not yet recorded | — | in progress |
+| Unit | Planned USD | Actual USD | Of which judge | Actual / planned | Attempts |
+|---|---|---|---|---|---|
+| T01 | 2.00 | 0.88 | — | 44% | 1 |
+| T02 | 1.50 | 0.77 | — | 51% | 1 |
+| T03 | 1.00 | 0.55 | — | 55% | 1 |
+| T04 | 1.50 | 0.47 | — | 32% | 1 |
+| Substantive total | 6.00 | 2.67 | — | 45% | 4 |
+| G1-CLOSE, first close | 5.00 (one plan line for all closes) | 1.69 | 0.44 | 34% | 1 |
+| G1-CLOSE, second close | (same line) | 1.49 | 0.48 | 30% | 1 |
+| G1-CLOSE, third close | (same line) | not yet recorded | — | — | in progress |
+| G1-CLOSE, two recorded closes | 5.00 | 3.18 | 0.92 | 64% | 2 |
 
-Recorded unit spend is 4.37 USD. The first close's `judged` event also records a judge cost
-of 0.44 USD; the events do not say whether the close's 1.69 includes it. The plan total is
-11.00 and the gate budget 14.00. This session's cost and its judge's are written later. The
-earlier `blocked_human` stop of this unit recorded 0.00. The review, its fixes and the
-amendment happened outside the loop, so `events.jsonl` has no cost for them.
+Recorded unit spend is 5.86 USD against a plan of 11.00 and a gate budget of 14.00. This
+session's cost and its judge's are written later. The earlier `blocked_human` stop of this
+unit recorded 0.00. The independent review, its fixes and both amendments happened outside
+the loop, so `events.jsonl` has no cost for them. Two of the three closes were re-closes
+forced by a precedence the plan had not stated.
 
 **T04's warning rate.** Re-measured this session over `done` units with `produces:`: the
-shipped rule (path, file name or parent directory) would fire on 35 of 402, **8.7%** (same as the first close), under
+shipped rule (path, file name or parent directory) would fire on 35 of 402, **8.7%**, under
 the 10% limit. Path or file name alone would fire on 81 of 402, 20.1%. T04 recorded 81 and
 35 of 401 in the check's docstring; the population has since grown by one. T04's progress
-note does not carry the count that its criterion 3 asked for in the RESULT notes, and this
-session did not see that RESULT. The parent-directory match is a plain substring test, so a
-short directory such as `tests` is satisfied by almost any body. The WARN is weak for such
-paths.
+note does not carry the count that its criterion 3 asked for in the RESULT notes. The
+parent-directory match is a plain substring test, so a short directory such as `tests` is
+satisfied by almost any body. The WARN is weak for such paths.
 
 ## Consumer-visible contract changes
 
 Pending human acknowledgment. Each has a `changelog.d/` fragment tracing to
-`FEAT-LOOP-2026-0251`. This re-close added no fragment; it extended the first one in place
-with the overtaken checks measured in cases D to G.
+`FEAT-LOOP-2026-0251`. This close added no fragment; it extended the first one in place with
+the rejected squash commit and the kept-tree effect.
 
-1. **Changed:** the three deliverable refusals run before verification. An attempt that
-   would also have failed a gate, `files_changed_mismatch`, the smoke-import check, a
-   closing-deliverable guard or the blocked-verdict check is reported as the deliverable
-   refusal.
+1. **Changed:** the three deliverable refusals run before verification. They take precedence
+   over every verification gate and later guard. An attempt that also would have failed one
+   is reported as the deliverable refusal. By default its tree is kept, including where the
+   old order reset it.
 2. **Added:** `defaults.fail_fast_deliverables`, default `true`.
 3. **Changed:** the retry note for the three refusals lists the changed paths, at most 20
    plus a count.
 4. **Added:** a `specfuse lint` WARN for a `produces:` path the unit's body never mentions.
 
+## Notes for the human reviewer
+
+Neither note is a failed criterion. This unit may edit none of the files concerned.
+
+- **One sentence in `docs/methodology.md` is too strong.** It says "What is refused does not
+  change, only when." Probe case Q is an attempt that passes with the key `false` and is
+  refused with the default, because a gate writes the declared file. `PLAN.md` decision 6,
+  `verification.yml.example` and a changelog fragment describe the opt-out for this; that
+  paragraph of the methodology does not say when to set it. `PLAN.md` has the same sentence.
+- **The side-effect list is incomplete.** `GATE-01.md` and `docs/methodology.md` name the
+  smoke-import and closing-deliverable refusals as ones that used to reset the tree. The
+  probe also saw the old order remove the attempt's file after a rejected squash commit, the
+  blocked-verdict check and a failed gate. The new behaviour follows clause 4 in each case.
+- The rule's words "every check that runs after the agent session" mean, as `GATE-01.md`
+  goes on to say, the gates and later guards. A zero-token session and a `blocked` RESULT
+  are still decided first, in both orders (cases N and O).
+
 ## What the loop did NOT verify
 
 - **A real project whose gates write a declared deliverable.** The opt-out is tested only
-  with stubs. With the default, such a unit is refused early on every attempt.
+  with stubs, probe case Q included. With the default, such a unit is refused early on every
+  attempt.
 - **Real refused attempts on the new build.** T01 to T04 ran on a build pinned before the
-  change (`bd7e508`). `events.jsonl` shows three later pins (`cddc418`, `eb30755`,
-  `b2513b4`), and both closes were dispatched after a later pin, so "every attempt ran on
-  the old build" holds for T01 to T04 and is not established for the closes. No event in
-  this feature shows a real early refusal, so no real saving in gate time is measured.
-- Tree handling for early `deliverable_missing` and `no_deliverable_files` refusals.
-- Tree handling in probe cases D, F and G; the difference stated above is from the code.
-- The probe used a stubbed `verify`. `no_deliverable_files` was not paired with any
-  overtaken check.
-- That cases A to G are the whole list of overtaken checks. The list comes from reading
-  `execute_unit_attempt()` and the post-squash guards in `run()`; a squash-commit failure,
-  for one, was not probed.
-- Any unit's "fails on HEAD" claim, against a pre-feature tree.
+  change (`bd7e508`). Later pins exist and the closes were dispatched after them, but every
+  `attempt_outcome` in `events.jsonl` before this close is `passed`. No real early refusal
+  has happened, so no real saving in gate time is measured.
+- The probe stubbed the agent session, `verify`, and (for H and P) the squash rejection.
+- That cases A to Q are the whole list of overtaken checks. The list comes from reading
+  `execute_unit_attempt()` and the post-squash guards in `run()`. The general rule does not
+  depend on the list being complete; the claim that it holds rests on the early check running
+  before all of them.
+- `learnings_not_staged` and the judge run after the three deliverable guards in the late
+  order too. This is read from the code, not probed.
+- A full pre-feature tree: only the old `loop.py` was substituted.
 - Whether the pending-diff computation matches the squash diff for renames, submodules or
-  ignored files. Only the oracle's simple cases were run.
+  ignored files.
+- The content of the pre-existing test edits was not compared again by this close.
 - `specfuse lint` as the installed command. The installed build differs from this tree, so
   the repository scripts were used.
-- `docs/methodology.md` states the early order but names no precedence; this unit may not
-  edit it. Its line "What is refused does not change, only when" was not checked beyond
-  the probe cases.
