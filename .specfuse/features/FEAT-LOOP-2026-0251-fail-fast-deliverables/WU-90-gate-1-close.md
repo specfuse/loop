@@ -73,7 +73,7 @@ folded_through_re_arm: 6
 gate_set: plannext
 driver_version: 0.33.2
 started_at: 2026-11-26T17:43:13.364717+00:00
-verdict: met
+verdict: not_met
 ---
 
 # G1-CLOSE — terminal close
