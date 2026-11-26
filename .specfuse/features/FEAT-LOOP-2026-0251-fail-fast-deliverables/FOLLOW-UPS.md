@@ -69,6 +69,8 @@ close found it present, and probe cases D to G were not run again.
 
 ### Definition of done clause 5 (arm-time warning)
 
+**Tracked as #3617.**
+
 The clause says lint warns when a `produces:` path appears nowhere in the unit body, by full path or file name. The code also stays silent when the body names only the parent directory.
 
 I tested a `pending` unit with `produces: specfuse/loop/loop.py`. Its body mentioned only `specfuse/loop/data/docs`, so it had neither the full path nor `loop.py`. No WARN was printed. A body naming none of these did warn.
@@ -80,6 +82,8 @@ I tested a `pending` unit with `produces: specfuse/loop/loop.py`. Its body menti
 
 ### Definition of done clause 4 (tree and note)
 
+**Tracked as #3618.**
+
 The clause says the retry note lists the paths this attempt changed, or says it changed none. In a kept tree, I had attempt 2 write only a new `docs/events.jsonl`, and separately only a new `docs/PROGRESS.md`. These are ordinary agent files, not the driver's bookkeeping files.
 
 In both cases the note said "(none — this attempt changed no files)", which is false. This happened with fail-fast both on and off. The control file `docs/plain.md` was listed correctly. The cause is that `format_changed_paths` drops paths by base name only.
@@ -88,6 +92,8 @@ In both cases the note said "(none — this attempt changed no files)", which is
 - exit: 0
 
 ### T04#3
+
+**Tracked as #3619.**
 
 I couldn't verify that T04's RESULT notes gave the measured count and total. I searched the feature's `events.jsonl`, `PROGRESS.md` and `work/` for the figures and found nothing.
 
