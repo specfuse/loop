@@ -2886,17 +2886,24 @@ def synthesize_retry_directive(failure_class: "str | None", *,
     per-class hint names the remedy generically.
     """
     if retained:
-        if failure_class in _GUARD_FAILURE_CLASSES:
+        if failure_class in _GUARD_FAILURE_CLASSES and not verification_ran:
+            # Refused before verification (FEAT-LOOP-2026-0251): the retained
+            # edits were never checked, and the missing deliverable is the
+            # unit's real work, not a mechanical fix-up.
+            lead = ("A deliverable guard refused this attempt before the "
+                    "verification gates ran. The previous attempt's edits "
+                    "are STILL PRESENT in the working tree but have NOT been "
+                    "verified. Keep what is correct, then do the missing "
+                    "deliverable work named above and re-emit the RESULT "
+                    "block in full. ")
+        elif failure_class in _GUARD_FAILURE_CLASSES:
             # A bookkeeping guard refused the pass (FEAT-2026-0103), not a
             # convergent unit mid-iteration: the tree is retained because
             # verify() already PASSED on it, and the one thing to avoid is
             # re-authoring work that is already correct.
-            verified = (
-                "and verification already PASSED on them" if verification_ran
-                else "but verification did not run on them")
             lead = ("A bookkeeping guard refused this attempt's pass. The "
                     "previous attempt's edits are STILL PRESENT in the "
-                    f"working tree, {verified} "
+                    "working tree, and verification already PASSED on them "
                     "— re-authoring them is the one thing not to do. Apply "
                     "only the mechanical fix below, then re-emit the RESULT "
                     "block in full. ")
@@ -3010,7 +3017,9 @@ def git(*args: str) -> str:
                           check=True).stdout.strip()
 
 
-def git_diff_names(head_before: str, head_after: str) -> list[str]:
+def git_diff_names(head_before: str, head_after: str, *,
+                   worktree: bool = False,
+                   exclude: "tuple[Path | str, ...]" = ()) -> list[str]:
     """Return file paths changed between two refs via git diff --name-only.
 
     When head_after is 'HEAD', also appends untracked files from
@@ -3026,10 +3035,19 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
     keeps the tree — resurfaces as a new untracked file on the NEXT attempt's
     measurement, breaking `detect_deterministic_refusal_repeat`'s "provably
     untouched tree" signal (#597) for every retried guard refusal.
+
+    *worktree* (only with ``head_after == "HEAD"``) also counts uncommitted
+    edits to tracked files, which the two-ref diff cannot see: an attempt's
+    work is not committed until the squash, so without it an attempt that only
+    edited tracked files reads as an untouched tree (FEAT-LOOP-2026-0251).
+    *exclude* drops driver-written paths, such as the unit file whose
+    `attempts:` the driver bumps before dispatch.
     """
     try:
+        diff_args = ([head_before] if worktree and head_after == "HEAD"
+                     else [head_before, head_after])
         names = subprocess.run(
-            ["git", "diff", "--name-only", head_before, head_after],
+            ["git", "diff", "--name-only", *diff_args],
             capture_output=True, text=True, check=True,
         ).stdout.strip().splitlines()
         if head_after == "HEAD":
@@ -3038,8 +3056,10 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
                 capture_output=True, text=True, check=True,
             ).stdout.strip().splitlines()
             names = names + [f for f in untracked if f]
+        skip = {Path(os.path.relpath(p)).as_posix() if Path(p).is_absolute()
+                else Path(p).as_posix() for p in exclude}
         return [f for f in names
-                if f and Path(f).name != PROGRESS_FILENAME]
+                if f and Path(f).name != PROGRESS_FILENAME and f not in skip]
     except subprocess.CalledProcessError:
         return []
 
@@ -12136,6 +12156,97 @@ def _downstream_line(cause_id: str, others: "list[WorkUnit]",
 
 
 
+def refusal_history_repeats(refusal_history: "list[tuple[str, list]]") -> bool:
+    """#597's halt condition on the newest two guard refusals."""
+    return len(refusal_history) >= 2 and detect_deterministic_refusal_repeat(
+        refusal_history[-1][0], refusal_history[-2][0],
+        refusal_history[-1][1],
+        prior_files_touched=refusal_history[-2][1])
+
+
+def replan_before_last_attempt(
+    wu: WorkUnit, attempt: int, *, wu_max_attempts: int,
+    replan_history: list[dict], attempt_notes: list, cum_usage: dict,
+    attempts_usage: list, attempt_outcomes: list, wu_events: list,
+    replanned_this_wu: bool, backend, work_dir: Path, feature_dir: Path,
+    events_path: Path, units: list, done_ids, gate, feature_id: str,
+) -> "tuple[str | None, WorkUnit]":
+    """Re-plan ahead of a unit's last permitted attempt (FEAT-2026-0104/T02).
+
+    Returns ``(status, wu)``: status is "blocked" when the re-plan escalated,
+    "replanned" when the body was rewritten (*wu* is then the reloaded unit),
+    and None when the trigger does not apply. Shared by `run()`'s
+    failed-verification path and its early deliverable refusals
+    (FEAT-LOOP-2026-0251), which otherwise never reach the trigger.
+    """
+    if should_replan_instead_of_retry(wu, attempt, wu_max_attempts):
+        try:
+            replan_result = run_replan_turn(wu, replan_history)
+        except ReplanUnchangedError:
+            note_paths = persist_attempt_notes(
+                work_dir, wu.wu_id, attempt_notes)
+            backend.set_wu(wu, "status", "blocked_human")
+            backend.set_wu(wu, "escalation_reason",
+                           "replan_unchanged_body")
+            write_cost_to_wu(backend, wu, cum_usage)
+            _unchanged_message = escalate_unit(
+                wu, gate.number, sorted(done_ids),
+                [w.wu_id for w in units
+                 if w.wu_id != wu.wu_id
+                 and w.status not in (DONE, "abandoned")],
+                "replan_unchanged_body",
+                resume_command_for(feature_id),
+                wu_max_attempts, attempt_outcomes,
+                replanned_this_wu,
+            )
+            wu_events.append(build_event(
+                "human_escalation", wu.wu_id, {
+                    "reason": "replan_unchanged_body",
+                    "attempts": attempt,
+                    "attempts_usage": attempts_usage,
+                    "message": _unchanged_message,
+                }))
+            flush_events(events_path, wu_events)
+            _progress_path = record_progress_entry(
+                feature_dir, wu, attempt, "replan_unchanged_body")
+            commit_bookkeeping(
+                [wu.file, events_path, _progress_path, *note_paths],
+                f"chore(loop): {wu.wu_id} blocked_human "
+                f"(replan_unchanged_body, attempt {attempt})"
+                f"\n\nFeature: {wu.wu_id}",
+            )
+            print(f"   BLOCKED — re-plan turn at attempt "
+                  f"{attempt}/{wu_max_attempts} returned a "
+                  f"body identical to its input; refusing to "
+                  f"dispatch an attempt that cannot differ "
+                  f"from the one before it")
+            return "blocked", wu
+        # The dispatched session's transcript IS the rewrite
+        # (T03): fold it into this unit's own attempt-note
+        # record so it rides with the evidence any later
+        # escalation for this unit persists to disk.
+        attempt_notes.append((
+            attempt,
+            "## Re-plan turn transcript\n\n"
+            + replan_result["transcript"]
+        ))
+        write_wu_body(wu.file, replan_result["body"])
+        wu = reload_unit_after_replan(units, feature_dir, wu)
+        # gate_eval.py's evaluate_auto_close reads this as
+        # check 2 (a WU that needed a re-plan disqualifies
+        # its gate from auto-close) — the consumer predates
+        # this emitter by two years (FEAT-2026-0018/T02).
+        wu_events.append(build_event("replan", wu.wu_id, {
+            "attempt": attempt,
+            "max_attempts": wu_max_attempts,
+        }))
+        print(f"   RE-PLANNED {wu.wu_id} after attempt "
+              f"{attempt}/{wu_max_attempts} — next dispatch "
+              f"uses a rewritten body")
+        return "replanned", wu
+    return None, wu
+
+
 def run(
     feature_arg: str | None,
     dry_run: bool,
@@ -12803,9 +12914,9 @@ def run(
                 replanned_this_wu = False
                 # Per-failed-attempt (class, signature, full note) — the raw
                 # material `synthesize_replan_brief` reads (FEAT-2026-0104/T03).
-                # Only the "failed" outcome branch below reaches the re-plan
-                # trigger check (every other outcome `continue`s earlier), so
-                # this only needs populating there.
+                # Populated by the two outcome paths that reach the re-plan
+                # trigger: a failed verification and an early deliverable
+                # refusal (FEAT-LOOP-2026-0251).
                 replan_history: list[dict] = []
                 # Cost accumulators: per-attempt list goes to events.jsonl,
                 # cumulative sum to WU frontmatter at outcome time.
@@ -12845,10 +12956,7 @@ def run(
                     # agent cannot edit its own frontmatter. Checked BEFORE the
                     # attempt counter is bumped and before dispatch, so the
                     # session that would buy nothing is never paid for.
-                    if len(refusal_history) >= 2 and detect_deterministic_refusal_repeat(
-                            refusal_history[-1][0], refusal_history[-2][0],
-                            refusal_history[-1][1],
-                            prior_files_touched=refusal_history[-2][1]):
+                    if refusal_history_repeats(refusal_history):
                         _rsum = refusal_history[-1][0]
                         note_paths = persist_attempt_notes(
                             work_dir, wu.wu_id, attempt_notes)
@@ -12924,7 +13032,12 @@ def run(
                     # reset_preserving_events -- afterwards the evidence is
                     # gone and files_touched would read empty by construction,
                     # which is what made #597's second condition vacuous.
-                    _refusal_touched = git_diff_names(head_before, "HEAD")
+                    # `worktree=True`: uncommitted tracked edits count too,
+                    # or an attempt that only edited tracked files would read
+                    # as an untouched tree (FEAT-LOOP-2026-0251).
+                    _refusal_touched = git_diff_names(
+                        head_before, "HEAD", worktree=True,
+                        exclude=(wu.file,))
 
                     if outcome == "zero_token":
                         # Agent never produced output (input_tokens=0). Skip
@@ -13152,7 +13265,7 @@ def run(
                             f"   PRODUCES NOT IN DIFF attempt "
                             f"{attempt}/{wu_max_attempts} — {_prod_summary}"
                         )
-                        continue
+                        _early_refusal = (_prod_event, _prod_note)
 
                     if outcome in ("no_deliverable_files",
                                    "deliverable_missing"):
@@ -13183,6 +13296,43 @@ def run(
                             f"{attempt}/{wu_max_attempts} — "
                             f"{payload['summary']}"
                         )
+                        _early_refusal = (_early_event, _early_note)
+
+                    if outcome in ("produces_not_in_diff",
+                                   "no_deliverable_files",
+                                   "deliverable_missing"):
+                        # An early refusal replaces the failed verification a
+                        # missing deliverable used to cause, so it keeps that
+                        # path's re-plan (FEAT-LOOP-2026-0251). A repeat on an
+                        # unmoved tree is left to #597's halt at the top of
+                        # the next attempt, as the failed path leaves a
+                        # spinning signature to its own halt.
+                        _ev_payload = _early_refusal[0]["payload"]
+                        replan_history.append({
+                            "attempt": attempt,
+                            "failure_class": _ev_payload.get("failure_class"),
+                            "failure_signature": _ev_payload.get(
+                                "failure_signature"),
+                            "note": _early_refusal[1],
+                        })
+                        if not refusal_history_repeats(refusal_history):
+                            _replan, wu = replan_before_last_attempt(
+                                wu, attempt, wu_max_attempts=wu_max_attempts,
+                                replan_history=replan_history,
+                                attempt_notes=attempt_notes, cum_usage=cum_usage,
+                                attempts_usage=attempts_usage,
+                                attempt_outcomes=attempt_outcomes,
+                                wu_events=wu_events,
+                                replanned_this_wu=replanned_this_wu, backend=backend,
+                                work_dir=work_dir, feature_dir=feature_dir,
+                                events_path=events_path, units=units,
+                                done_ids=done_ids, gate=gate, feature_id=feature_id)
+                            if _replan == "blocked":
+                                blocked = True
+                                break
+                            if _replan == "replanned":
+                                replanned_this_wu = True
+                                failure_note = None
                         continue
 
                     if outcome == "passed":
@@ -13998,73 +14148,23 @@ def run(
                     # declined to `break` this attempt loop — a repeated
                     # guard refusal or spinning signature escalates there and
                     # never reaches this trigger.
-                    if should_replan_instead_of_retry(wu, attempt, wu_max_attempts):
-                        try:
-                            replan_result = run_replan_turn(wu, replan_history)
-                        except ReplanUnchangedError:
-                            note_paths = persist_attempt_notes(
-                                work_dir, wu.wu_id, attempt_notes)
-                            backend.set_wu(wu, "status", "blocked_human")
-                            backend.set_wu(wu, "escalation_reason",
-                                           "replan_unchanged_body")
-                            write_cost_to_wu(backend, wu, cum_usage)
-                            _unchanged_message = escalate_unit(
-                                wu, gate.number, sorted(done_ids),
-                                [w.wu_id for w in units
-                                 if w.wu_id != wu.wu_id
-                                 and w.status not in (DONE, "abandoned")],
-                                "replan_unchanged_body",
-                                resume_command_for(feature_id),
-                                wu_max_attempts, attempt_outcomes,
-                                replanned_this_wu,
-                            )
-                            wu_events.append(build_event(
-                                "human_escalation", wu.wu_id, {
-                                    "reason": "replan_unchanged_body",
-                                    "attempts": attempt,
-                                    "attempts_usage": attempts_usage,
-                                    "message": _unchanged_message,
-                                }))
-                            flush_events(events_path, wu_events)
-                            _progress_path = record_progress_entry(
-                                feature_dir, wu, attempt, "replan_unchanged_body")
-                            commit_bookkeeping(
-                                [wu.file, events_path, _progress_path, *note_paths],
-                                f"chore(loop): {wu.wu_id} blocked_human "
-                                f"(replan_unchanged_body, attempt {attempt})"
-                                f"\n\nFeature: {wu.wu_id}",
-                            )
-                            print(f"   BLOCKED — re-plan turn at attempt "
-                                  f"{attempt}/{wu_max_attempts} returned a "
-                                  f"body identical to its input; refusing to "
-                                  f"dispatch an attempt that cannot differ "
-                                  f"from the one before it")
-                            blocked = True
-                            break
-                        # The dispatched session's transcript IS the rewrite
-                        # (T03): fold it into this unit's own attempt-note
-                        # record so it rides with the evidence any later
-                        # escalation for this unit persists to disk.
-                        attempt_notes.append((
-                            attempt,
-                            "## Re-plan turn transcript\n\n"
-                            + replan_result["transcript"]
-                        ))
-                        write_wu_body(wu.file, replan_result["body"])
-                        wu = reload_unit_after_replan(units, feature_dir, wu)
-                        # gate_eval.py's evaluate_auto_close reads this as
-                        # check 2 (a WU that needed a re-plan disqualifies
-                        # its gate from auto-close) — the consumer predates
-                        # this emitter by two years (FEAT-2026-0018/T02).
-                        wu_events.append(build_event("replan", wu.wu_id, {
-                            "attempt": attempt,
-                            "max_attempts": wu_max_attempts,
-                        }))
+                    _replan, wu = replan_before_last_attempt(
+                        wu, attempt, wu_max_attempts=wu_max_attempts,
+                        replan_history=replan_history,
+                        attempt_notes=attempt_notes, cum_usage=cum_usage,
+                        attempts_usage=attempts_usage,
+                        attempt_outcomes=attempt_outcomes,
+                        wu_events=wu_events,
+                        replanned_this_wu=replanned_this_wu, backend=backend,
+                        work_dir=work_dir, feature_dir=feature_dir,
+                        events_path=events_path, units=units,
+                        done_ids=done_ids, gate=gate, feature_id=feature_id)
+                    if _replan == "blocked":
+                        blocked = True
+                        break
+                    if _replan == "replanned":
                         replanned_this_wu = True
                         failure_note = None
-                        print(f"   RE-PLANNED {wu.wu_id} after attempt "
-                              f"{attempt}/{wu_max_attempts} — next dispatch "
-                              f"uses a rewritten body")
                         continue
                     failure_note = (
                         synthesize_retry_directive(_fc, retained=_retained)

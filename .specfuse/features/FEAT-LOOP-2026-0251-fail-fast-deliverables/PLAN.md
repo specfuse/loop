@@ -110,3 +110,23 @@ gates:
 - LEARNINGS `[FEAT-LOOP-2026-0250/T01]`: a test that validates events through `validate_event`
   pins the packaged schemas and clears the validator caches.
 - `produces:` lists only `.py` files under `tests/` (#3539).
+- **Review follow-ups (2026-11-26, before the close, operator-approved).** An independent review
+  of the gate's diff found three behaviour changes the early order introduced; fixed on this
+  branch, test-first, in `tests/test_fail_fast_deliverables.py` (`TestEarlyRefusalRecovery`,
+  `TestEarlyRetainedNoteWording`):
+  1. An early refusal now consults the re-plan trigger (`replan_before_last_attempt`, extracted
+     from the failed-verification path), unless it is a repeat on an unmoved tree, which stays
+     #597's halt. Before, a unit that never wrote its deliverable lost the re-plan a failed
+     verification used to give it.
+  2. The refusal measurement `_refusal_touched` counts uncommitted edits to tracked files
+     (`git_diff_names(..., worktree=True)`, excluding the unit file). Before, an attempt that only
+     edited tracked files read as an untouched tree and could be halted as
+     `deterministic_refusal_repeat` after two early refusals. `detect_deterministic_refusal_repeat`
+     itself is unchanged; its #1415 rule (identical summary and identical changed-file set) still
+     halts.
+  3. An early refusal with a retained tree gets its own retry lead: the edits are kept but NOT
+     verified, and the missing deliverable is the work to do — not "apply only the mechanical
+     fix".
+  Accepted, not fixed: a deliverable that only a verification gate writes (a code generator, a
+  formatter) is refused early on every attempt; `fail_fast_deliverables: false` is the remedy,
+  and no in-loop test covers a gate-written deliverable.

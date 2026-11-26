@@ -333,7 +333,10 @@ class TestTreeAndNote(_Case):
                                "fail_fast_deliverables": fail_fast}
             return cfg
 
-        def dispatch(wu, note, ct=True):
+        def dispatch(wu, note, cost_tracking=True):
+            if wu.body.startswith(loop._REPLAN_BRIEF_MARKER):
+                # An early refusal re-plans before the last attempt too.
+                return "# T01\n\nRe-planned body.\n"
             if wu.wu_id == T01:
                 notes.append(note)
                 if len(notes) == 1:
@@ -460,6 +463,85 @@ class TestArmTimeWarning(_Case):
         with contextlib.redirect_stdout(out):
             lint_plan.lint(fdir)
         self.assertIn("zzz/unnamed-thing.md", out.getvalue())
+
+
+class TestEarlyRefusalRecovery(_Case):
+    """Review follow-up: an early refusal keeps the recovery paths a failed
+    verification had — re-planning before the last attempt, and the
+    repeated-refusal halt firing only on a tree that really did not move."""
+
+    def _run(self, act):
+        """`loop.run()` with T01 calling *act(n)* on its n-th attempt and never
+        touching `src/rule.py`. Returns (attempt count, re-plan turns, T01
+        frontmatter text)."""
+        _, fdir = self._workspace()
+        Path("a.py").write_text("A = 0\n")
+        Path("b.py").write_text("B = 0\n")
+        _git("add", ".")
+        _git("commit", "-q", "-m", "tracked files")
+        attempts, replans = [], []
+
+        def dispatch(wu, note, cost_tracking=True):
+            if wu.body.startswith(loop._REPLAN_BRIEF_MARKER):
+                replans.append(wu.wu_id)
+                return "# T01\n\nRe-planned body: write src/rule.py.\n"
+            if wu.wu_id == T01:
+                attempts.append(note)
+                act(len(attempts))
+            return _COMPLETE
+
+        self._patch("dispatch", dispatch)
+        self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(loop.run(None, dry_run=False), 1)
+        return len(attempts), replans, (fdir / "WU-T01.md").read_text()
+
+    def test_early_refusal_replans_before_the_last_attempt(self):
+        def new_note(n):
+            Path("docs").mkdir(exist_ok=True)
+            Path(f"docs/notes-{n}.md").write_text(f"{n}\n")
+
+        count, replans, _ = self._run(new_note)
+        self.assertEqual(replans, [T01])
+        self.assertEqual(count, 3)
+
+    def test_tracked_edits_are_not_an_untouched_tree(self):
+        def edit_tracked(n):
+            Path("a.py" if n == 1 else "b.py").write_text(f"X = {n}\n")
+
+        count, _, wu_text = self._run(edit_tracked)
+        self.assertNotIn("deterministic_refusal_repeat", wu_text)
+        self.assertEqual(count, 3)
+
+    def test_untouched_tree_still_halts_without_replanning(self):
+        count, replans, wu_text = self._run(lambda n: None)
+        self.assertIn("escalation_reason: deterministic_refusal_repeat",
+                      wu_text)
+        self.assertEqual(count, 2)
+        self.assertEqual(replans, [])
+
+
+class TestEarlyRetainedNoteWording(unittest.TestCase):
+    """Review follow-up: a retained tree that was never verified is not
+    'correct work to leave alone' — the missing deliverable IS the work."""
+
+    def test_early_retained_note_asks_for_the_missing_work(self):
+        for fc in ("produces_not_in_diff", "guard_refusal"):
+            with self.subTest(failure_class=fc):
+                lead = loop.synthesize_retry_directive(
+                    fc, retained=True, verification_ran=False)
+                self.assertIn("NOT been verified", lead)
+                self.assertIn("missing deliverable", lead)
+                self.assertNotIn("re-authoring them is the one thing", lead)
+                self.assertNotIn("only the mechanical fix", lead)
+                self.assertNotIn("refused this attempt's pass", lead)
+
+    def test_late_retained_note_is_unchanged(self):
+        lead = loop.synthesize_retry_directive(
+            "produces_not_in_diff", retained=True, verification_ran=True)
+        self.assertIn("verification already PASSED", lead)
+        self.assertIn("only the mechanical fix", lead)
+
 
 if __name__ == "__main__":
     unittest.main()
