@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_fail_fast_deliverables -v -b"
 cost_budget_usd: 14.00
 broad_run:
@@ -31,7 +31,16 @@ leaves a known diff and a `verify_fn` that counts its calls:
    verification did not run and lists the paths this attempt changed (or says it changed
    none).
 5. **Arm-time warning.** `specfuse lint` prints a WARN for a dispatchable unit whose `produces:`
-   path appears nowhere in its body, by full path or file name, and stays silent when it does.
+   path appears nowhere in its body, by full path, file name or parent directory, and stays
+   silent when it does. *(Parent directory added 2026-11-26 by the operator after the sixth
+   close, #3617: `PLAN.md` decision 7 required narrowing above a 10% warning rate; by full path
+   or file name the warning fired on 81 of 401 `done` units with `produces:` (20.2%), with the
+   parent directory on 35 (8.7%).)* **Measurement record** *(operator, 2026-11-26, #3619):* the
+   driver keeps no RESULT notes from passed attempts, so T04's measured count and total are
+   recorded by the `check_produces_mentioned` docstring in `specfuse/loop/lint_plan.py` (81 and
+   35 of 401) and confirmed by the sixth close's judge, who recounted independently (81 and 35
+   of 402; one unit finished since). That pair is the accepted evidence for WU-04's reporting
+   criterion.
 6. **Nothing else changes.** Every existing test of the three guards passes unchanged, apart
    from assertions on the order of `verify` and the guard, and edits forced by moving code into
    a shared helper or by new lint wording that a text-matching assertion picks up. No such edit

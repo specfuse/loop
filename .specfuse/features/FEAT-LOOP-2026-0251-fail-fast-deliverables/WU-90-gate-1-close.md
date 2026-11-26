@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -16,7 +16,7 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_plan.py
     - specfuse/loop/loop.py
   reason: "Review fixes tested, full suite green, accept the generator risk"
-re_arm_count: 6
+re_arm_count: 7
 re_arm_history:
   -
     timestamp: 2026-11-26T13:30:05+00:00
@@ -60,6 +60,13 @@ re_arm_history:
     prior_cost_usd: 1.347591
     prior_duration_seconds: 616.642
     reason: "Fixed renames, modes and non-ASCII names, re-close it"
+  -
+    timestamp: 2026-11-26T21:34:17+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.657563
+    prior_duration_seconds: 747.309
+    reason: "Amend both as recommended, fixed bookkeeping paths, re-close it"
 cumulative_cost_usd: 7.698064
 cumulative_duration_seconds: 2026.017
 cumulative_input_tokens: 280
@@ -73,7 +80,6 @@ folded_through_re_arm: 6
 gate_set: plannext
 driver_version: 0.33.2
 started_at: 2026-11-26T17:43:13.364717+00:00
-verdict: not_met
 ---
 
 # G1-CLOSE — terminal close
@@ -140,3 +146,13 @@ comparing each path's state at the start and end of the attempt (`snapshot_dirty
 `git add -N` crash on a new non-ASCII file predates this feature and is outside clause 4. Update
 the closing files in place as before, and say in `FOLLOW-UPS.md` whether #3614's re-run
 condition now holds.
+
+**Sixth re-close note (2026-11-26).** The sixth close recorded `not_met` on #3617, #3618 and
+#3619. #3618 (the retry note dropped an agent's own `docs/events.jsonl` or `docs/PROGRESS.md`
+because it matched driver bookkeeping by base name) is fixed on the branch: it now matches the
+unit file, `events.jsonl` and `PROGRESS.md` by full path in the unit's feature folder (tests in
+`TestTreeAndNote`; see `PLAN.md` Notes). For #3617 and #3619 the operator amended `GATE-01.md`
+clause 5: the warning stays silent when the body names the path's parent directory (narrowed
+under `PLAN.md` decision 7), and T04's measurement is recorded there with its evidence. Update
+the closing files in place as before, and say in `FOLLOW-UPS.md` whether each of #3617, #3618
+and #3619's re-run conditions now holds.
