@@ -2,6 +2,8 @@
 
 ### An early refusal records a different outcome from the late order for one input
 
+**Tracked as #3608.**
+
 **Criterion (verbatim).** "A surviving skip, or an early refusal whose outcome or failure
 class differs from the late one for the same input: record `not_met` with a follow-up."
 
@@ -34,6 +36,8 @@ refusal takes precedence over `files_changed_mismatch`, or case A records the sa
 and failure class with the key `true` and `false`, asserted by a test.
 
 ### Clause 6 does not hold literally for two pre-existing tests
+
+**Tracked as #3609.**
 
 **Criterion (verbatim).** "**Nothing else changes.** Every existing test of the three
 guards passes unchanged, apart from assertions on the order of `verify` and the guard, which
