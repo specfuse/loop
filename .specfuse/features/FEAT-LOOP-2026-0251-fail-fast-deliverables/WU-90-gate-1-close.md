@@ -1,9 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: done
-verdict: not_met
-attempts: 1
+status: pending
+attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -17,7 +16,7 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_plan.py
     - specfuse/loop/loop.py
   reason: "Review fixes tested, full suite green, accept the generator risk"
-re_arm_count: 3
+re_arm_count: 4
 re_arm_history:
   -
     timestamp: 2026-11-26T13:30:05+00:00
@@ -40,6 +39,13 @@ re_arm_history:
     prior_cost_usd: 1.489002
     prior_duration_seconds: 259.427
     reason: "1, go ahead"
+  -
+    timestamp: 2026-11-26T16:08:13+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.733084
+    prior_duration_seconds: 379.569
+    reason: "Trying to fix the last issue"
 cumulative_cost_usd: 3.181952
 cumulative_duration_seconds: 550.857
 cumulative_input_tokens: 118
@@ -99,3 +105,9 @@ closing-deliverable checks). The operator chose to state one general precedence 
 `GATE-01.md`, in the escalation trigger above and in `docs/methodology.md`, together with the
 kept-tree side effect. Update `RETROSPECTIVE.md`, `FOLLOW-UPS.md` and the other closing files in
 place as before, and say in `FOLLOW-UPS.md` whether #3610's re-run condition now holds.
+
+**Third re-close note (2026-11-26).** The third close's judge recorded `not_met` on #3612: with
+the tree kept, a later attempt's retry note listed the earlier attempt's kept edits as its own
+(clause 4). Fixed on the branch (`snapshot_dirty_tree`, `attempt_own_paths` in `loop.py`; tests
+in `TestTreeAndNote`; see `PLAN.md` Notes). Update the closing files in place as before, and say
+in `FOLLOW-UPS.md` whether #3612's re-run condition now holds.
