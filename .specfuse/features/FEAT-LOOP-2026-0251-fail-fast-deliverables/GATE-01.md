@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_fail_fast_deliverables -v -b"
 cost_budget_usd: 14.00
 broad_run:
