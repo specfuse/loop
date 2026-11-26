@@ -516,6 +516,13 @@ order, in which they run only after verification passes. What is refused does
 not change, only when. The retry note for these refusals also lists the paths
 the attempt did change. `specfuse lint` warns before arming when a unit's body
 never mentions a `produces:` path (full path, file name or parent directory).
+A deliverable refusal takes precedence over every check that runs after the
+agent session: on an attempt that also fails a gate, `files_changed_mismatch`,
+the smoke-import guard, the blocked-verdict guard or a closing-deliverable
+guard, only the deliverable refusal is recorded, and the other check runs on a
+later attempt. Because the early refusal follows `retain_on_guard_refusal`, such
+an attempt keeps its tree by default where the smoke-import and
+closing-deliverable refusals would have reset it.
 
 **Retain-and-repair (FEAT-2026-0103).** `files_changed_mismatch`,
 `produces_not_in_diff`, `deliverable_missing`, and `no_deliverable_files` —

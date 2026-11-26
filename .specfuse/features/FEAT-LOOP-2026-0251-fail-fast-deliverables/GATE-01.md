@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_fail_fast_deliverables -v -b"
 cost_budget_usd: 14.00
 broad_run:
@@ -39,12 +39,22 @@ leaves a known diff and a `verify_fn` that counts its calls:
    operator after the first close, #3609.)*
 
 **Precedence when two refusals apply** *(stated 2026-11-26 by the operator after the first
-close, #3608).* An attempt whose RESULT claims a declared `produces:` path it did not change
-trips both `produces_not_in_diff` and `files_changed_mismatch`. Under the default order the
-deliverable refusal wins and verification does not run; with `fail_fast_deliverables: false`
-the old `files_changed_mismatch` outcome holds. Both sides are asserted by
+close, #3608; widened after the second close, #3610).* Under the default order a deliverable
+refusal (`produces_not_in_diff`, `deliverable_missing`, `no_deliverable_files`) takes
+precedence over every check that runs after the agent session: the verification gates and
+the later guards, including `files_changed_mismatch`, `smoke_import_failed`, the
+blocked-verdict guard and the closing-deliverable guards. An attempt that trips a
+deliverable refusal and one of those checks records the deliverable refusal, and the other
+check runs only on a later attempt, once the deliverable is fixed. With
+`fail_fast_deliverables: false` the old order and its outcomes hold. The
+`files_changed_mismatch` pair is asserted on both sides by
 `TestProducesNotInDiffEarly.test_deliverable_refusal_outranks_files_changed_mismatch`.
 Clause 3's "same outcome and failure class" applies to inputs that trip only one refusal.
+
+One side effect follows and is accepted. The early refusal keeps or resets the tree per
+`defaults.retain_on_guard_refusal` (clause 4), so by default it keeps the tree. The
+smoke-import and closing-deliverable refusals it now outranks always reset it. On an input
+that trips both, the next attempt therefore starts from the kept tree, not a clean one.
 
 The `feature_oracle` proves 1–5. It is red on the current tree; `FEAT-LOOP-2026-0251/T01` is the
 walking skeleton that creates `tests/test_fail_fast_deliverables.py` and turns clause 1 green,

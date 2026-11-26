@@ -1,9 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-verdict: not_met
-status: done
-attempts: 1
+status: pending
+attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -17,7 +16,7 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_plan.py
     - specfuse/loop/loop.py
   reason: "Review fixes tested, full suite green, accept the generator risk"
-re_arm_count: 2
+re_arm_count: 3
 re_arm_history:
   -
     timestamp: 2026-11-26T13:30:05+00:00
@@ -33,6 +32,13 @@ re_arm_history:
     prior_cost_usd: 1.69295
     prior_duration_seconds: 291.43
     reason: "A for both, go ahead"
+  -
+    timestamp: 2026-11-26T15:22:22+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.489002
+    prior_duration_seconds: 259.427
+    reason: "1, go ahead"
 cumulative_cost_usd: 1.69295
 cumulative_duration_seconds: 291.43
 cumulative_input_tokens: 70
@@ -76,12 +82,19 @@ warns on a `produces:` path its unit never mentions.
 **Verification.** `specfuse lint --closing`, plus the gate set in `.specfuse/verification.yml`.
 
 **Escalation triggers.** A surviving skip, or an early refusal whose outcome or failure class
-differs from the late one for the same input, other than the deliverable-over-
-`files_changed_mismatch` precedence `GATE-01.md` states (#3608): record `not_met` with a
-follow-up.
+differs from the late one for the same input, other than the precedence `GATE-01.md` states
+under "Precedence when two refusals apply" (a deliverable refusal outranks every check that
+runs after the agent session, #3608 and #3610): record `not_met` with a follow-up.
 
 **Re-close note (2026-11-26).** The first close recorded `not_met` on #3608 and #3609; the
 operator chose to amend the definition of done for both (see `GATE-01.md` clause 6 and
 "Precedence when two refusals apply"). That close already wrote `RETROSPECTIVE.md`,
 `FOLLOW-UPS.md`, `LEARNINGS-pending.md` and changelog fragments: update them in place, do not
 duplicate fragments, and say in `FOLLOW-UPS.md` whether each entry's re-run condition now holds.
+
+**Second re-close note (2026-11-26).** The second close recorded `not_met` on #3610 (cases D to
+G: the deliverable refusal also outranks the smoke-import, blocked-verdict and
+closing-deliverable checks). The operator chose to state one general precedence rule; it is in
+`GATE-01.md`, in the escalation trigger above and in `docs/methodology.md`, together with the
+kept-tree side effect. Update `RETROSPECTIVE.md`, `FOLLOW-UPS.md` and the other closing files in
+place as before, and say in `FOLLOW-UPS.md` whether #3610's re-run condition now holds.
