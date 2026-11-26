@@ -47,6 +47,8 @@ units with `produces:` gave 81 and 35 of 402.
 
 ### Resolved at earlier closes
 
+**Tracked as #3621.**
+
 The text below is as the sixth close wrote it. Its "this close" and "this session" mean the
 close named in each entry or the sixth. Where #3614 lists files named like driver bookkeeping
 as a limit, #3618 above has since narrowed it.
