@@ -3570,6 +3570,34 @@ def _checked_checkout(checkout_args: list[str], action: str) -> str:
     return proc.stdout.strip()
 
 
+def _feature_plan_missing_on_base(feature_dir: "Path | None", base: str) -> "str | None":
+    """Repo-relative PLAN.md path when it is committed at HEAD but absent from
+    *base*, else None (#3601). None too when it cannot be resolved: this guard
+    only ever adds a refusal, never a new way to fail."""
+    if feature_dir is None:
+        return None
+    try:
+        top = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        rel = (Path(feature_dir) / "PLAN.md").resolve().relative_to(
+            Path(top).resolve()
+        ).as_posix()
+    except (subprocess.CalledProcessError, ValueError):
+        return None
+
+    def _present(rev: str) -> bool:
+        return subprocess.run(
+            ["git", "cat-file", "-e", f"{rev}:{rel}"],
+            capture_output=True, check=False,
+        ).returncode == 0
+
+    if _present("HEAD") and not _present(base):
+        return rel
+    return None
+
+
 def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> None:
     """Ensure HEAD is on the feature's declared branch, creating it if needed.
 
@@ -3728,6 +3756,22 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
                 )
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
+        # A feature folder committed on the current branch but absent from the
+        # base would not exist on a branch cut from that base: the next read of
+        # PLAN.md would crash with the operator already moved off their branch
+        # (#3601). Refuse before switching. An untracked folder is unaffected
+        # -- `checkout -B` carries it along, which is what --prepare relies on.
+        plan_rel = _feature_plan_missing_on_base(feature_dir, base)
+        if plan_rel:
+            raise FeatureBranchError(
+                f"feature branch '{branch}' does not exist, and its base "
+                f"'{base}' does not contain '{plan_rel}': a branch cut from "
+                f"'{base}' would not hold this feature. The feature is "
+                f"committed on '{current}'. Either create the branch from here "
+                f"(`git branch {branch}`) or merge the feature into '{base}' "
+                f"first, then re-run. Nothing was switched; you are still on "
+                f"'{current}'."
+            )
         # Create-from-base carries the working tree onto the new branch. Only
         # the expected /pick-feature flips may ride along; anything else stops.
         dirty = _tracked_dirty_paths()
@@ -11901,7 +11945,12 @@ def run(
         require_session_env_writable()
         require_feature_folder_committed(feature_dir, feat_fm, feature_id)
         require_feature_folder_unmodified(feature_dir, feat_fm, feature_id)
-        ensure_feature_branch(feat_fm, feature_dir)
+        try:
+            ensure_feature_branch(feat_fm, feature_dir)
+        except FeatureBranchError as exc:
+            print(f"specfuse run cannot enter the feature branch:\n{exc}",
+                  file=sys.stderr)
+            return 1
 
     try:
 
