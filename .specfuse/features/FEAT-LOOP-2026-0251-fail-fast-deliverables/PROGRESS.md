@@ -16,3 +16,5 @@
   - note: Build the retry note's list by comparing attempt-start and attempt-end path states (content and mode, read with --no-renames -z), and reuse the -z reading for the git add -N crash on non-ASCII names.
 - **FEAT-LOOP-2026-0251/G1-CLOSE**: Sixth close of gate 1 confirms the
   - note: Weigh probe case N2 (a file named events.jsonl outside the feature folder is left out of the retry note); the non-UTF-8 decode in _paths_differing_from and the older git add -N crash have no filed issue.
+- **FEAT-LOOP-2026-0251/G1-CLOSE**: Seventh close of gate 1 updated the closing files in place with advisory verdict met, confirming that the re-run conditions of
+  - note: No follow-up is open, so the older git add -N crash on non-ASCII names and the non-UTF-8 decode in _paths_differing_from have no tracked issue (see RETROSPECTIVE.md, "Notes for the human reviewer").

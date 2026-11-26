@@ -1,9 +1,55 @@
 # Follow-ups — FEAT-LOOP-2026-0251
 
-Sixth close, 2026-11-26. No entry is open. The re-run conditions of #3608, #3609, #3610,
-#3612, #3613 and #3614 hold.
+Seventh close, 2026-11-26. No entry is open. The re-run conditions of #3608, #3609, #3610,
+#3612, #3613, #3614, #3617, #3618 and #3619 hold.
 
 ## Resolved
+
+#### Definition of done clause 5 (arm-time warning)
+
+**Tracked as #3617.** **Re-run condition holds.** The entry's gap was that clause 5 did not
+allow the parent-directory match. `GATE-01.md` clause 5 now says the warning is silent when
+the body names the path's parent directory, narrowed under `PLAN.md` decision 7. This
+close's probe of `check_produces_mentioned` on `specfuse/loop/loop.py`: silent for the full
+path, the file name and `specfuse/loop/data/docs` (the entry's case, which contains the
+parent `specfuse/loop`); WARN for a body naming none. The entry's silent result is now the
+stated behaviour. With the parent directory dropped from the check in a scratch copy,
+`TestArmTimeWarning` gives 1 failure.
+
+- command: `PYTHONPATH=. python3 $TMPDIR/close7/p5.py`
+- exit: 0
+
+#### Definition of done clause 4 (tree and note)
+
+**Tracked as #3618.** **Re-run condition holds.** On a kept tree, attempt 2 writing only
+`docs/events.jsonl`, or only `docs/PROGRESS.md`, now gets that file in its note, with
+fail-fast on and off; so do the same names at the repository root and a `docs/WU-T01.md`.
+Writing nothing still says "changed no files". Covered by
+`test_agent_files_named_like_driver_bookkeeping_are_listed`. With the base-name filter put
+back in a scratch copy, `TestTreeAndNote` gives 2 failures. The driver's own three files in
+the feature folder are still left out. Git-ignored files are still not listed; the entry did
+not name them (see `RETROSPECTIVE.md`).
+
+- command: `PYTHONPATH=. python3 $TMPDIR/close7/p4.py` (uses
+  `TestTreeAndNote._second_attempt_note`)
+- exit: 0
+
+#### T04#3
+
+**Tracked as #3619.** **Re-run condition holds**, by amendment. T04's RESULT notes still have
+not been seen: the driver keeps none for passed attempts. `GATE-01.md` clause 5 ("Measurement
+record") accepts the `check_produces_mentioned` docstring and the sixth judge's recount. The
+docstring reads 81 and 35 of 401, matching `GATE-01.md`. This close's own recount of `done`
+units with `produces:` gave 81 and 35 of 402.
+
+- command: `PYTHONPATH=. python3 $TMPDIR/close7/count.py`
+- exit: 0
+
+### Resolved at earlier closes
+
+The text below is as the sixth close wrote it. Its "this close" and "this session" mean the
+close named in each entry or the sixth. Where #3614 lists files named like driver bookkeeping
+as a limit, #3618 above has since narrowed it.
 
 #### The retry note's path list missed renames, non-ASCII names and mode changes
 
@@ -62,42 +108,7 @@ this session; the probe's case A agrees.
 The ten changed modules pass (68 tests, exit 0), and the two edits are named in
 `RETROSPECTIVE.md`.
 
-This sixth close reran the oracle (which holds the #3608, #3612, #3613 and #3614 tests), the
-ten modules behind #3609 (68 tests, `OK`) and the unfiltered-list control. For #3610 the
-condition is wording in `GATE-01.md`, the close unit and `docs/methodology.md`; the fifth
-close found it present, and probe cases D to G were not run again.
-
-### Definition of done clause 5 (arm-time warning)
-
-**Tracked as #3617.**
-
-The clause says lint warns when a `produces:` path appears nowhere in the unit body, by full path or file name. The code also stays silent when the body names only the parent directory.
-
-I tested a `pending` unit with `produces: specfuse/loop/loop.py`. Its body mentioned only `specfuse/loop/data/docs`, so it had neither the full path nor `loop.py`. No WARN was printed. A body naming none of these did warn.
-
-`test_parent_directory_mention_is_silent` asserts this silent behaviour. T04's text allowed narrowing the match, but clause 5 was never amended. Clause 6 and the precedence rule were amended explicitly, and no deliverable is recorded as dropped by amendment.
-
-- command: `PYTHONPATH=. python3 $TMPDIR/p5.py` (calls `lint_plan.check_produces_mentioned` on temporary units; the "dir-only" case printed nothing)
-- exit: 0
-
-### Definition of done clause 4 (tree and note)
-
-**Tracked as #3618.**
-
-The clause says the retry note lists the paths this attempt changed, or says it changed none. In a kept tree, I had attempt 2 write only a new `docs/events.jsonl`, and separately only a new `docs/PROGRESS.md`. These are ordinary agent files, not the driver's bookkeeping files.
-
-In both cases the note said "(none — this attempt changed no files)", which is false. This happened with fail-fast both on and off. The control file `docs/plain.md` was listed correctly. The cause is that `format_changed_paths` drops paths by base name only.
-
-- command: `PYTHONPATH=. python3 $TMPDIR/p4.py` (uses `TestTreeAndNote._second_attempt_note`)
-- exit: 0
-
-### T04#3
-
-**Tracked as #3619.**
-
-I couldn't verify that T04's RESULT notes gave the measured count and total. I searched the feature's `events.jsonl`, `PROGRESS.md` and `work/` for the figures and found nothing.
-
-The numbers themselves look right. My own count gave 402 `done` units with `produces:`. 81 would warn when matching only path or file name, and 35 when the parent directory also counts. The code docstring says 81 and 35 of 401. That doesn't show what the RESULT notes said.
-
-- command: `grep -rnE "81 of 401|35 \(8\.7|20\.2%" <feature>/events.jsonl <feature>/PROGRESS.md <feature>/work`
-- exit: 1
+This seventh close reran the oracle (which holds the #3608, #3612, #3613, #3614 and #3618
+tests) and the ten modules behind #3609 (68 tests, `OK`). It did not repeat the earlier
+mutation for #3612 and #3613 or probe cases D to G. For #3610 the condition is wording in
+`GATE-01.md`, the close unit and `docs/methodology.md`; the fifth close found it present.

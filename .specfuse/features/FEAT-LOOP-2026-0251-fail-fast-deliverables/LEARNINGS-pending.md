@@ -34,4 +34,7 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
   `--no-renames -z`. Test write, edit, delete, revert, rename and a non-ASCII name on a
   second attempt, and probe the whole matrix before the first fix, not one case per close
   (the state comparison closed the whole matrix at once; three filter fixes had not). When
-  switching git reads to `-z`, decide how a non-UTF-8 name decodes: quoting had hidden that.
+  switching git reads to `-z`, decide how a non-UTF-8 name decodes: quoting had hidden that. A filter that
+  hides the tool's own bookkeeping must match full paths: matched by base name it also hid an
+  agent's own `docs/events.jsonl`, and a close that argued such a limit was acceptable was
+  overruled by the judge.

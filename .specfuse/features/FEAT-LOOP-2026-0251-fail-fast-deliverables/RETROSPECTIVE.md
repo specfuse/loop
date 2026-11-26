@@ -4,33 +4,60 @@
 
 ## Verdict
 
-`met` (advisory; the judge concludes). This is the sixth close of the gate. The #3614 cases
-are fixed: both names of a rename, a restored old name, a mode-only change and later changes
-to a non-ASCII name are listed, with fail-fast on and off. The oracle passes (42 tests, no
-skips). This session did not rerun the early-against-late probe; the fourth and fifth closes'
-runs of it showed no difference beyond the stated precedence.
+`met` (advisory; the judge concludes). This is the seventh close of the gate. The re-run
+conditions of #3617, #3618 and #3619 hold: lint is silent on a parent-directory mention, as
+amended clause 5 says; an agent's own `docs/events.jsonl` or `docs/PROGRESS.md` is now in the
+retry note; and `GATE-01.md` records the warning-rate measurement and its accepted evidence,
+which an independent recount in this session agrees with. The oracle passes (43 tests, no
+skips). This session did not rerun the early-against-late probe; its tables below are the
+fourth and fifth closes' observations.
 
-One judgement call sits under clause 4. The list leaves out any file *named* `events.jsonl`,
-`PROGRESS.md` or like the unit file, in any directory, and files git ignores (probe cases N2
-and S10). I read both as outside "the paths this attempt changed": the guards use the same
-by-name bookkeeping rule, and the diff they judge never holds ignored files. Under a literal
-reading, a note that says "changed no files" in case N2 is wrong.
+Limits that remain under clause 4: the note does not list files git ignores, and it leaves out
+the driver's own three files in the feature folder (the unit file, `events.jsonl`,
+`PROGRESS.md`) even if an agent edits one. Non-UTF-8 names and an older crash are under
+"Notes for the human reviewer".
 
 ## Measurements
 
-All commands ran fresh in this sixth close on the working tree, unless a line says
-otherwise. Test runs and probes used `HOME` under `$TMPDIR` with a stub git identity,
+Commands in this section ran fresh in this seventh close on the working tree, unless a line
+says otherwise. Test runs and probes used `HOME` under `$TMPDIR` with a stub git identity,
 because with the real `HOME` the sandbox blocks the driver's preflight write (observed in
-the fourth close). git version 2.53.0.
+the fourth close).
 
 ### feature_oracle: PASS
 
-`python3 -m unittest tests.test_fail_fast_deliverables -v -b`: exit 0, `Ran 42 tests`, `OK`,
+`python3 -m unittest tests.test_fail_fast_deliverables -v -b`: exit 0, `Ran 43 tests`, `OK`,
 no skips. `grep -c "unittest.skip" tests/test_fail_fast_deliverables.py` prints `0`. A search
 of that file for `unittest.skip`, `skipIf`, `skipUnless`, `skipTest` and `@skip` finds nothing.
-It does not cover the limits in cases N2 and S10 below.
 
-### Retry note on a kept tree (#3614 and beyond it)
+### Retry note: files named like driver bookkeeping (#3618)
+
+A throwaway probe drove `loop.run()` through the oracle's `_second_attempt_note` (kept tree,
+stubbed agent session and `verify`) and read attempt 2's path list. Every row gave the same
+list with fail-fast on and off.
+
+| Attempt 2 does | Note lists |
+|---|---|
+| writes a new `docs/events.jsonl` | that file |
+| writes a new `docs/PROGRESS.md` | that file |
+| writes a new `events.jsonl` at the repository root | that file |
+| writes a new `PROGRESS.md` at the repository root | that file |
+| writes a new `docs/WU-T01.md` (the unit file's name) | that file |
+| writes `docs/plain.md` (control) | that file |
+| edits a tracked `docs/PROGRESS.md` that attempt 1 had edited | that file |
+| nothing | "changed no files" |
+| appends to the feature folder's own `events.jsonl` | "changed no files" (driver file, left out by design) |
+| writes a git-ignored file | "changed no files" (**ignored file not listed**) |
+
+The guard itself still filters by base name (`assert_implementation_touched_files`, read from
+the code). So an `implementation` attempt whose only new file is, say, `docs/events.jsonl`
+can be refused as `no_deliverable_files` while its note lists that file. The note is right
+about what changed; the guard rule is older than this feature and clause 6 leaves it alone.
+
+### Retry note on a kept tree (#3614 and beyond it), as run in the sixth close
+
+This table is the sixth close's observation, not run again. The oracle's tests for these
+kinds of change passed in this session. Row N2 is superseded by the table above.
 
 A throwaway probe drove `loop.run()` through the oracle's own helper
 (`_second_attempt_note`, kept tree, stubbed agent session and `verify`) and read the path
@@ -66,10 +93,10 @@ and off.
 | S10 | writes a new file | writes a git-ignored file | "changed no files" | **ignored file not listed** |
 | N2 | writes a new file | writes `docs/events.jsonl` | "changed no files" | **file not listed** |
 
-N2 follows from `format_changed_paths`, which drops by base name (`events.jsonl`,
-`PROGRESS.md`, the unit file's name). `assert_implementation_touched_files` filters the same
-way, and `git_diff_names` drops `PROGRESS.md` by base name. Only the `events.jsonl` name was
-run; the other two names are read from the code.
+N2 was true on the sixth close's tree, where `format_changed_paths` dropped by base name.
+It now matches the three driver files by full path (#3618). `git_diff_names` still drops
+`PROGRESS.md` by base name from the guard's diff, but the note's list is built from the
+attempt-start comparison, so the table above shows the file listed.
 
 First attempt, reset tree, fail-fast on and off: a new `docs/ñ.md` is listed unquoted, and a
 rename of the tracked deliverable `src/rule.py` lists both names (in the presence-refusal
@@ -107,7 +134,7 @@ builds) when tracked, and an untracked one cannot be created on macOS.
 | Check | Result |
 |---|---|
 | `python3 -m unittest tests.test_dispatch_skeleton tests.test_gate_timings -b` | 25 tests, `OK` |
-| `python3 -m unittest tests.test_lint_plan -b` (named by T04) | **error: no such module** |
+| `python3 -m unittest tests.test_lint_plan -b` (named by T04) | **import error: no such module** |
 | the `tests/test_lint_plan*.py` modules that do exist | 46 tests, `OK` |
 | the ten changed pre-existing test modules | 68 tests, `OK` |
 | `.specfuse/scripts/lint_plan.py` over every feature folder with a `PLAN.md` | 97 linted, 0 non-zero exits |
@@ -115,38 +142,36 @@ builds) when tracked, and an untracked one cannot be created on macOS.
 | `diff docs/methodology.md specfuse/loop/data/docs/methodology.md` | exit 0, empty |
 | `python3 -m specfuse.loop.changelog_fragments check` | exit 0 |
 
-This session did not run the full suite or coverage. The driver's broad run recorded at
-2026-11-26T17:43:13Z has `ok: true` and no failing gate. Its tests log
-(`work/gate-logs/`, stamp `20261126T174230`) shows `Ran 5156 tests`, `OK (skipped=4)`; its
-coverage log shows 92% total.
+This session did not run the full suite or coverage. The log of the driver's latest broad run
+(`work/gate-logs/`, stamps `20261126T2143`) shows `Ran 5157 tests`, `OK (skipped=4)`, and 92%
+total coverage. `GATE-01.md` records that run with `ok: true` and no failing gate.
 
 ### Controls: the oracle observes the feature
 
-Each mutation ran in a scratch copy of the package, tests and `.specfuse/` (without the
-feature folders). The unmodified copy ran the 42 oracle tests: `OK`. `TestTreeAndNote` has 18
-tests; failure counts include subtests.
+Each mutation ran in a scratch copy of the package, scripts, tests, docs and `.specfuse/`
+(without the feature folders). The unmodified copy ran the 43 oracle tests: `OK`.
 
 | Mutation | Result |
 |---|---|
-| `resolve_fail_fast_deliverables` forced to return `False` | 42 tests: 13 failures |
-| `attempt_own_paths` returns its input unfiltered | `TestTreeAndNote`: 20 failures |
-| rename pairing turned back on (`--find-renames`) | `TestTreeAndNote`: 3 failures |
-| mode bits left out of `_path_state` | `TestTreeAndNote`: 2 failures |
-| non-ASCII names mangled, as quoting would | `TestTreeAndNote`: 4 failures |
-| attempt-start paths left out of the compared set | `TestTreeAndNote`: 10 failures |
-| `check_produces_mentioned` made a no-op | `TestArmTimeWarning`, 6 tests: 2 failures (the other four expect silence) |
-| `loop.py` replaced by the pre-feature one (`bd7e508` pin) | 42 tests: 12 failures, 30 errors |
+| `resolve_fail_fast_deliverables` forced to return `False` | 43 tests: 13 failures |
+| note filter turned back to base names | `TestTreeAndNote`, 19 tests: 2 failures |
+| parent directory no longer accepted by the lint check | `TestArmTimeWarning`, 6 tests: 1 failure |
 
-On the old driver, every failing `TestProducesNotInDiffEarly` and `TestPresenceEarly` entry is
-an error, so the first mutation is the behaviour evidence for those two classes. `TestOptOut`
-and `TestTreeAndNote` also fail on assertions. This is not a full pre-feature tree.
+Earlier controls, from the sixth close and not repeated: an unfiltered `attempt_own_paths`
+(20 failures), rename pairing turned back on (3), mode bits left out of `_path_state` (2),
+mangled non-ASCII names (4), attempt-start paths left out of the compared set (10), a no-op
+`check_produces_mentioned` (2), and the pre-feature `loop.py` (`bd7e508` pin; 12 failures and
+30 errors in 42 tests). On the old driver every failing `TestProducesNotInDiffEarly` and
+`TestPresenceEarly` entry was an error, so the first mutation is the behaviour evidence for
+those two classes. That substitution was not a full pre-feature tree.
 
 ### Early against late, same input
 
-These tables are earlier closes' observations. **This sixth close did not run the probe
-again.** The source change named since is the path-list code, whose only caller is
-`format_changed_paths` (checked by `grep`). This session reran the oracle, which holds the
-`files_changed_mismatch` pair (case A) and the single-refusal pairs in `TestOptOut`.
+These tables are earlier closes' observations. **Neither the sixth nor this seventh close
+ran the probe again.** The source changes named since are in the path-list code, reached only
+through `format_changed_paths`, whose three call sites build retry notes (checked by `grep`).
+This session reran the oracle, which holds the `files_changed_mismatch` pair (case A) and the
+single-refusal pairs in `TestOptOut`.
 
 The probe drove `loop.run()` over the oracle's fixture and read the first `attempt_outcome`
 for T01, once with fail-fast on and once off. Verification is a stub. The unit declares
@@ -190,19 +215,19 @@ firing alone when every declared path is changed, and early presence refusals wi
 All 13 criteria were looked at again. `GATE-01-CRITERIA.md` is left as the driver seeded it,
 because it is not one of this unit's permitted closing surfaces.
 
-| Criterion | Result | Evidence |
+| Criterion | Result | Evidence from this session |
 |---|---|---|
-| T01#1 | passes | `TestProducesNotInDiffEarly`; on the old driver errors only, behaviour shown by the first mutation |
+| T01#1 | passes | `TestProducesNotInDiffEarly` in the oracle; first mutation. "Fails on HEAD" rests on the sixth close's old-driver run |
 | T01#2 | passes | `test_early_record_equals_late_record` (plain RESULT, passing stub) |
 | T01#3 | passes | 25 tests, `OK` |
-| T02#1 | passes | `TestPresenceEarly`; on the old driver errors only, behaviour shown by the first mutation |
-| T02#2 | passes | `TestOptOut`; assertion failures on the old driver |
+| T02#1 | passes | `TestPresenceEarly` in the oracle; first mutation. "Fails on HEAD" as for T01#1 |
+| T02#2 | passes | `TestOptOut` in the oracle |
 | T02#3 | passes | empty diff |
-| T03#1 | passes; limits in N2 and S10 | `TestTreeAndNote` (18); assertion failures on the old driver |
+| T03#1 | passes; limit: ignored files | `TestTreeAndNote` (19); lookalike probe; base-name mutation |
 | T03#2 | passes | `test_list_is_capped_at_twenty` |
-| T04#1 | passes | `TestArmTimeWarning`; no-op control |
+| T04#1 | passes | `TestArmTimeWarning`; parent-directory mutation; lint probe |
 | T04#2 | passes with the repository script | 97 folders, 0 non-zero exits |
-| T04#3 | not observed | no close has seen T04's RESULT; the count is re-measured below |
+| T04#3 | accepted under clause 5's measurement record | T04's RESULT notes were not seen by any close; `GATE-01.md` accepts the docstring (81 and 35 of 401) and the sixth judge's recount. This session's recount agrees: 81 and 35 of 402 |
 | T04#4 | passes | empty diff |
 | T04#5 | passes | prints `0` |
 
@@ -215,8 +240,8 @@ carried forward: 0 criteria, re-measured: 13
 | 1. `produces_not_in_diff` early | Refused with 0 `verify_fn` calls, `verify_seconds` 0, no attempt-phase `gate_result`; a changed path verifies once and passes; a justified path still verifies; class, signature and summary equal the late site's | `TestProducesNotInDiffEarly` (6 tests) |
 | 2. Presence early | Absent, empty and bookkeeping-only diffs are refused with 0 calls | `TestPresenceEarly` (3) |
 | 3. Opt-out | With the key `false`, each of the three cases verifies once; outcome, class, signature and summary equal the default's, for inputs that trip one refusal | `TestOptOut` (4), on plain-RESULT, passing-stub inputs; probe cases C, L, M |
-| 4. Tree and note | Proven, with the by-name and ignored-file limits (N2, S10). The note says verification did not run; lists written, edited, deleted, reverted, renamed (both names), mode-changed and non-ASCII-named paths; leaves out untouched kept edits; caps at 20; the tree is kept or reset | `TestTreeAndNote` (18); probe cases R0 to R15 and S1 to S9. The kept/reset assertions use `produces_not_in_diff` only |
-| 5. Arm-time WARN | Warns on an unmentioned path; silent on full path, file name or parent directory, and on `done` / `abandoned`; `lint()` calls it | `TestArmTimeWarning` (6) |
+| 4. Tree and note | Proven, with the ignored-file limit. The note says verification did not run; lists written, edited, deleted, reverted, renamed (both names), mode-changed and non-ASCII-named paths, and agent files named like driver bookkeeping; leaves out untouched kept edits and the driver's own three files; caps at 20; the tree is kept or reset | `TestTreeAndNote` (19); this session's lookalike probe; sixth close's cases R0 to R15 and S1 to S9. The kept/reset assertions use `produces_not_in_diff` only |
+| 5. Arm-time WARN | Warns on an unmentioned path; silent on full path, file name or parent directory (as amended, #3617), and on `done` / `abandoned`; `lint()` calls it. The measurement record is in `GATE-01.md` (#3619) | `TestArmTimeWarning` (6), including `test_parent_directory_mention_is_silent`; lint probe; recount |
 | 6. Nothing else changes | Holds as widened for #3609. See the list below | `diff -ru` of `tests/` against the recorded base; the ten modules pass |
 | Precedence over every later check | Holds on every probed pair. A test asserts only the `files_changed_mismatch` pair | `test_deliverable_refusal_outranks_files_changed_mismatch`; this session, the oracle test only; probe cases carried from the fourth and fifth closes |
 
@@ -226,11 +251,11 @@ moved tree; an untouched tree still halts) and `TestEarlyRetainedNoteWording` (2
 
 ## Pre-existing tests changed
 
-This sixth close ran no git command on the repository and did not repeat the tree comparison.
+This seventh close ran no git command on the repository and did not repeat the tree comparison.
 It listed the files under `tests/`, `specfuse/`, `scripts/`, `.specfuse/scripts/` and `docs/`
-modified after the fifth close last wrote `LEARNINGS-pending.md`: only
+modified after the sixth close last wrote `LEARNINGS-pending.md`: only
 `specfuse/loop/loop.py` and the feature's own `tests/test_fail_fast_deliverables.py` (the
-#3614 fix and its tests). No pre-existing test is newer. The third, fourth and fifth closes
+#3618 fix and its tests). No pre-existing test is newer. The third to sixth closes
 did the same kind of check, each against the close before, back to the second close's
 comparison, below. These are modification-time checks, not content diffs. The ten modules
 were rerun in this session. In the comparison text, "this session" means the second close.
@@ -288,21 +313,28 @@ The third close (2026-11-26T15:45Z) recorded `met`. The judge lowered it to `not
 clause 4, and the driver filed #3612: the note listed an earlier attempt's kept edits as the
 later attempt's own. That close, like the two before it, tested "changed nothing" only on a
 first attempt. The fix (`snapshot_dirty_tree`, `attempt_own_paths`, three tests) was made on
-the branch outside any work unit, and the operator re-armed this unit. This fourth close
+the branch outside any work unit, and the operator re-armed this unit. The fourth close
 probed removals on a kept tree and found that deleted and reverted files were missing.
 
 The fourth close (2026-11-26T16:28Z) and the judge recorded `not_met`, and the driver filed
 #3613. The fix to `attempt_own_paths` and three tests were made on the branch outside any
 work unit, and the operator re-armed this unit. The fifth close confirmed that fix and
-probed renames, non-ASCII names and a mode change. #3612, #3613 and the gaps now open are
+probed renames, non-ASCII names and a mode change. #3612, #3613 and the gaps then open were
 all in one list, built by filtering a name-only diff; each fix so far covered the cases the
 previous close had named.
 
 The fifth close (2026-11-26T17:03Z) and the judge recorded `not_met`, and the driver filed
 #3614. The fix replaced filtering of the guard's diff with a comparison of each path's state
 at the start and end of the attempt, which is the first option that close recommended. It was
-made on the branch outside any work unit, and the operator re-armed this unit. This sixth
+made on the branch outside any work unit, and the operator re-armed this unit. The sixth
 close confirmed it on the whole earlier matrix and ten further cases.
+
+The sixth close (2026-11-26T18:04Z) recorded `met`. The judge lowered it to `not_met` on three
+findings, and the driver filed #3617 (clause 5 never amended for the parent directory), #3618
+(the note dropped agent files by base name; the sixth close had probed this as case N2 and
+judged it acceptable, wrongly) and #3619 (T04's measurement not visible in its RESULT notes).
+The operator fixed #3618 on the branch outside any work unit, amended clause 5 for the other
+two, and re-armed this unit.
 
 T04 passed although its Verification section names `tests.test_lint_plan`, which does not
 exist.
@@ -325,30 +357,32 @@ includes its judge: `record_judge_cost_fold` adds the judge's usage to the attem
 | G1-CLOSE, third close | (same line) | 1.73 | 0.57 | 35% | 1 |
 | G1-CLOSE, fourth close | (same line) | 1.44 | 0.36 | 29% | 1 |
 | G1-CLOSE, fifth close | (same line) | 1.35 | 0.47 | 27% | 1 |
-| G1-CLOSE, sixth close | (same line) | not yet recorded | — | — | in progress |
-| G1-CLOSE, five recorded closes | 5.00 | 7.70 | 2.32 | 154% | 5 |
+| G1-CLOSE, sixth close | (same line) | 1.66 | 0.48 | 33% | 1 |
+| G1-CLOSE, seventh close | (same line) | not yet recorded | — | — | in progress |
+| G1-CLOSE, six recorded closes | 5.00 | 9.36 | 2.80 | 187% | 6 |
 
-Recorded unit spend is 10.37 USD against a plan of 11.00 and a gate budget of 14.00. The
-close line is well past its 5.00 plan, and this session's cost and its judge's are written
-later. The earlier `blocked_human` stop of this unit recorded 0.00. The independent review,
-its fixes, both amendments and the #3612, #3613 and #3614 fixes happened outside the loop,
-so `events.jsonl` has no cost for them. All five re-closes cost money for questions the plan
-or the oracle had left open: two for an unstated precedence, then one each for #3612, #3613
-and #3614.
+Recorded unit spend is 12.03 USD. That is over the plan of 11.00 (109%) and under the gate
+budget of 14.00, with this session's cost and its judge's still to be written. The earlier
+`blocked_human` stop of this unit recorded 0.00. The independent review, its fixes, the
+amendments and the #3612, #3613, #3614 and #3618 fixes happened outside the loop, so
+`events.jsonl` has no cost for them. All six re-closes cost money for questions the plan or
+the oracle had left open: two for an unstated precedence, one each for #3612, #3613 and
+#3614, and this one for #3617 to #3619.
 
-**T04's warning rate.** Re-measured this session over `done` units with `produces:`: the
-shipped rule (path, file name or parent directory) would fire on 35 of 402, **8.7%**, under
-the 10% limit. Path or file name alone would fire on 81 of 402, 20.1%. T04 recorded 81 and
-35 of 401 in the check's docstring; the population has since grown by one. T04's progress
-note does not carry the count that its criterion 3 asked for in the RESULT notes. The
-parent-directory match is a plain substring test, so a short directory such as `tests` is
-satisfied by almost any body. The WARN is weak for such paths.
+**T04's warning rate.** T04 recorded, in the check's docstring, 81 of 401 `done` units with
+`produces:` for path or file name alone (20.2%) and 35 with the parent directory (8.7%).
+Re-measured this session: the shipped rule would fire on 35 of 402, **8.7%**, under the 10%
+limit; path or file name alone on 81 of 402, 20.1%. The population has grown by one. T04's
+progress note does not carry the count. The parent-directory match is a plain substring
+test, so a short directory such as `tests` is satisfied by almost any body, and a mention of
+a subdirectory (`specfuse/loop/data/docs`) also silences `specfuse/loop/loop.py`. The WARN is
+weak for such paths.
 
 ## Consumer-visible contract changes
 
 Pending human acknowledgment. Each has a `changelog.d/` fragment tracing to
 `FEAT-LOOP-2026-0251`. This close added no fragment; it corrected the retry-note one in
-place, replacing the limits that #3614 fixed.
+place, replacing the base-name limit that #3618 fixed.
 
 1. **Changed:** the three deliverable refusals run before verification. They take precedence
    over every verification gate and later guard. An attempt that also would have failed one
@@ -358,7 +392,8 @@ place, replacing the limits that #3614 fixed.
 3. **Changed:** the retry note for the three refusals lists the changed paths, at most 20
    plus a count. Untouched edits kept from an earlier attempt are left out; deletes,
    reverts, both names of a rename, mode-only changes and non-ASCII names are listed. Not
-   listed: git-ignored files, and files named like the driver's bookkeeping.
+   listed: git-ignored files, and the driver's own unit file, `events.jsonl` and
+   `PROGRESS.md` in the feature folder.
 4. **Added:** a `specfuse lint` WARN for a `produces:` path the unit's body never mentions.
 
 ## Notes for the human reviewer
@@ -376,8 +411,8 @@ None of these is a failed criterion. This unit may edit none of the files concer
 - **Older defect, worth its own bug.** A refused attempt that keeps its tree and has a
   changed file with a non-ASCII name stops the driver with `CalledProcessError`:
   `git_diff_names` returns git's quoted form and `git add -N` rejects it (probe R4). The
-  fourth close saw the pre-feature `loop.py` do the same. R4 reproduced in this close. This
-  close filed no issue for it, and with no open follow-up entry the driver will file none.
+  fourth close saw the pre-feature `loop.py` do the same. R4 reproduced in the sixth close. No
+  close has filed an issue for it, and with no open follow-up entry the driver will file none.
 
 - **One sentence in `docs/methodology.md` is too strong.** It says "What is refused does not
   change, only when." Probe case Q is an attempt that passes with the key `false` and is
@@ -402,7 +437,8 @@ None of these is a failed criterion. This unit may edit none of the files concer
   `attempt_outcome` in `events.jsonl` before this close is `passed`. No real early refusal
   has happened, so no real saving in gate time is measured.
 - The probes stubbed the agent session, `verify`, and (for H and P) the squash rejection.
-- Every early-against-late probe case, and the other observations listed as not run again.
+- Every early-against-late probe case, the sixth close's path-list matrix, its crash and
+  non-UTF-8 probes, and the other observations listed as not run again.
 - A non-UTF-8 name on a real filesystem, and any run on Linux.
 - Submodules and nested repositories (the one nested probe crashed in `git add -A`), changes
   to an empty directory, `core.filemode=false`, and special files such as a named pipe.
