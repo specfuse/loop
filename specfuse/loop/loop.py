@@ -5326,13 +5326,24 @@ def format_changed_paths(wu: "WorkUnit", changed: list,
     `assert_implementation_touched_files` leaves it out: the driver writes it
     on every attempt, so listing it would hide that the agent changed nothing.
 
+    Those files are matched by full path, in the unit's feature folder, so
+    an agent's own `docs/events.jsonl` or `PROGRESS.md` elsewhere is still
+    listed (#3618).
+
     *tree_before* is the attempt-start snapshot (`snapshot_dirty_tree`): paths
     a kept earlier attempt left, unchanged since, are not this attempt's and
     are left out (#3612).
     """
+    feature_dir = Path(wu.file).parent
+    bookkeeping = {
+        Path(os.path.relpath(f)).as_posix() if Path(f).is_absolute()
+        else Path(f).as_posix()
+        for f in (wu.file, feature_dir / "events.jsonl",
+                  feature_dir / PROGRESS_FILENAME)
+    }
     paths = [
         t for t in attempt_own_paths(changed, tree_before)
-        if Path(t).name not in (wu.file.name, "events.jsonl", PROGRESS_FILENAME)
+        if Path(t).as_posix() not in bookkeeping
     ]
     if not paths:
         return "(none — this attempt changed no files)"

@@ -632,6 +632,20 @@ class TestTreeAndNote(_Case):
             with self.subTest(fail_fast=ff):
                 self.assertIn("this attempt changed no files", listed)
 
+    def test_agent_files_named_like_driver_bookkeeping_are_listed(self):
+        # #3618: only the driver's own files are left out, by full path; an
+        # agent's `docs/events.jsonl` or `docs/PROGRESS.md` is listed.
+        def write_lookalikes():
+            Path("docs/events.jsonl").write_text("{}\n")
+            Path("docs/PROGRESS.md").write_text("progress\n")
+
+        for ff, listed in self._listed(write_lookalikes).items():
+            with self.subTest(fail_fast=ff):
+                self.assertIn("- `docs/events.jsonl`", listed)
+                self.assertIn("- `docs/PROGRESS.md`", listed)
+                self.assertNotIn("WU-T01.md", listed)
+                self.assertNotIn(".specfuse/features/", listed)
+
     def test_list_is_capped_at_twenty(self):
         def thirty():
             Path("docs").mkdir(exist_ok=True)

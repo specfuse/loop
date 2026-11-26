@@ -151,3 +151,8 @@ gates:
   for each case, with and without `fail_fast_deliverables`; a non-ASCII kept edit left alone
   still reads "changed no files". The driver crash on `git add -N` for a new non-ASCII file is a
   separate, pre-existing defect (it predates this feature) and is not fixed here.
+- **Sixth-close follow-up (2026-11-26, #3618).** The note left out the driver's bookkeeping by
+  base name, so an agent's own `docs/events.jsonl` or `docs/PROGRESS.md` was dropped and the note
+  could say "changed no files". It now matches the unit file, `events.jsonl` and `PROGRESS.md` by
+  full path in the unit's feature folder. Tested in `TestTreeAndNote`, with and without
+  `fail_fast_deliverables`.
