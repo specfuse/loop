@@ -437,11 +437,27 @@ class TestTreeAndNote(_Case):
         self.assertIn("- `docs/other.md`", note)
         self.assertNotIn("verification did not run", note)
 
-    def _second_attempt_note(self, second_act, fail_fast: bool = True) -> str:
-        """`loop.run()` with a kept tree: attempt 1 writes `docs/notes.md`,
-        attempt 2 runs *second_act*. Returns the note recorded for attempt 2
-        (`work/<unit>/attempt-2.md`, written when the unit halts)."""
-        _, fdir = self._workspace()
+    @staticmethod
+    def _write_notes():
+        Path("docs").mkdir(exist_ok=True)
+        Path("docs/notes.md").write_text("notes\n")
+
+    def _second_attempt_note(self, second_act, fail_fast: bool = True,
+                             first_act=None, tracked=None) -> str:
+        """`loop.run()` with a kept tree: attempt 1 runs *first_act* (default:
+        write `docs/notes.md`), attempt 2 runs *second_act*. *tracked* maps
+        paths to content committed before the run. Returns the note recorded
+        for attempt 2 (`work/<unit>/attempt-2.md`, written when the unit
+        halts)."""
+        root, fdir = self._workspace()
+        first_act = first_act or self._write_notes
+        for rel, text in (tracked or {}).items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+            subprocess.run(["git", "add", rel], check=True)
+        if tracked:
+            subprocess.run(["git", "commit", "-q", "-m", "tracked fixture"],
+                           check=True)
         dispatched = []
         load = loop.load_verification
 
@@ -457,8 +473,7 @@ class TestTreeAndNote(_Case):
             if wu.wu_id == T01:
                 dispatched.append(note)
                 if len(dispatched) == 1:
-                    Path("docs").mkdir(exist_ok=True)
-                    Path("docs/notes.md").write_text("notes\n")
+                    first_act()
                 elif len(dispatched) == 2:
                     second_act()
             return _COMPLETE
@@ -511,6 +526,43 @@ class TestTreeAndNote(_Case):
         note = self._second_attempt_note(rewrite_notes)
         listed = self._path_list(note)
         self.assertIn("- `docs/notes.md`", listed)
+
+    def test_deleting_a_kept_file_lists_it(self):
+        # #3613: a deleted kept file has left the diff the guard judged.
+        for fail_fast in (True, False):
+            with self.subTest(fail_fast=fail_fast):
+                listed = self._path_list(self._second_attempt_note(
+                    lambda: Path("docs/notes.md").unlink(),
+                    fail_fast=fail_fast))
+                self.assertIn("- `docs/notes.md`", listed)
+                self.assertNotIn("changed no files", listed)
+
+    def test_reverting_a_kept_tracked_edit_lists_it(self):
+        def edit():
+            Path("docs/tracked.md").write_text("edited\n")
+
+        def revert():
+            Path("docs/tracked.md").write_text("original\n")
+
+        for fail_fast in (True, False):
+            with self.subTest(fail_fast=fail_fast):
+                listed = self._path_list(self._second_attempt_note(
+                    revert, fail_fast=fail_fast, first_act=edit,
+                    tracked={"docs/tracked.md": "original\n"}))
+                self.assertIn("- `docs/tracked.md`", listed)
+                self.assertNotIn("changed no files", listed)
+
+    def test_deleting_a_kept_file_and_writing_another_lists_both(self):
+        def swap():
+            Path("docs/notes.md").unlink()
+            Path("docs/second.md").write_text("second\n")
+
+        for fail_fast in (True, False):
+            with self.subTest(fail_fast=fail_fast):
+                listed = self._path_list(
+                    self._second_attempt_note(swap, fail_fast=fail_fast))
+                self.assertIn("- `docs/notes.md`", listed)
+                self.assertIn("- `docs/second.md`", listed)
 
     def test_list_is_capped_at_twenty(self):
         def thirty():

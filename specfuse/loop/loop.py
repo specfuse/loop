@@ -3125,14 +3125,24 @@ def snapshot_dirty_tree(head_before: str) -> "dict[str, str | None]":
 
 def attempt_own_paths(changed: list,
                       tree_before: "dict[str, str | None] | None") -> list:
-    """*changed* without the paths an earlier, kept attempt left that this
-    attempt did not touch again (#3612). A path counts as this attempt's when
-    it was clean at the start of the attempt or its contents have changed
-    since. With no snapshot, *changed* is returned unchanged."""
+    """The paths this attempt changed, given *changed* (the diff the guard
+    judged) and the attempt-start snapshot (#3612).
+
+    A path in *changed* counts when it was clean at the start of the attempt
+    or its contents have changed since; an earlier, kept attempt's edit the
+    attempt did not touch again is left out. A snapshot path that has left
+    *changed* because the attempt deleted it or reverted it to the committed
+    content counts too (#3613): it is not in the diff any more, but this
+    attempt changed it. With no snapshot, *changed* is returned unchanged.
+    """
     if not tree_before:
         return list(changed)
-    return [p for p in changed
-            if p not in tree_before or _path_digest(p) != tree_before[p]]
+    in_diff = set(changed)
+    own = [p for p in changed
+           if p not in tree_before or _path_digest(p) != tree_before[p]]
+    own += [p for p, digest in tree_before.items()
+            if p not in in_diff and _path_digest(p) != digest]
+    return own
 
 
 def ignored_paths() -> set[str]:

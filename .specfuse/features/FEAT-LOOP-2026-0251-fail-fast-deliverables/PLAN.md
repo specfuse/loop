@@ -138,3 +138,8 @@ gates:
   `files_touched` are unchanged, so `detect_deterministic_refusal_repeat` is unaffected. Tested in
   `TestTreeAndNote` (kept edits left out, nothing-changed stated, a re-edited kept file listed),
   both with and without `fail_fast_deliverables`.
+- **Fourth-close follow-up (2026-11-26, #3613).** A kept file the attempt deleted, or reverted to
+  its committed content, had left the diff the guard judged, so the note missed it and could say
+  "changed no files". `attempt_own_paths` now also lists every attempt-start snapshot path that
+  is no longer in that diff and whose content has changed. Tested in `TestTreeAndNote` (deleted,
+  reverted tracked edit, deleted plus a new file), with and without `fail_fast_deliverables`.
