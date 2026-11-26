@@ -1,12 +1,11 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
-verdict: not_met
 model: sonnet
 effort: high
 judge_edit_acknowledged:
@@ -17,7 +16,7 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_plan.py
     - specfuse/loop/loop.py
   reason: "Review fixes tested, full suite green, accept the generator risk"
-re_arm_count: 1
+re_arm_count: 2
 re_arm_history:
   -
     timestamp: 2026-11-26T13:30:05+00:00
@@ -26,6 +25,13 @@ re_arm_history:
     prior_cost_usd: 0.0
     prior_duration_seconds: 0.0
     reason: "Review fixes tested, full suite green, accept the generator risk"
+  -
+    timestamp: 2026-11-26T13:50:58+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.69295
+    prior_duration_seconds: 291.43
+    reason: "A for both, go ahead"
 cumulative_cost_usd: 0.0
 cumulative_duration_seconds: 0.0
 cumulative_input_tokens: 0
@@ -51,8 +57,8 @@ warns on a `produces:` path its unit never mentions.
 
 1. `RETROSPECTIVE.md` records, per Definition-of-done clause in `GATE-01.md`, what was proven
    and by which test, and that no `unittest.skip` survives in
-   `tests/test_fail_fast_deliverables.py`. It lists every pre-existing test whose assertion on
-   the order of verify and guard was changed (clause 6), with why.
+   `tests/test_fail_fast_deliverables.py`. It lists every pre-existing test that was changed
+   (clause 6, as widened for #3609), with why.
 2. Each consumer-visible change (the new order, `defaults.fail_fast_deliverables`, the retry
    note's path list, the lint WARN) is written with
    `python3 -m specfuse.loop.changelog_fragments add`, tracing to `FEAT-LOOP-2026-0251`.
@@ -69,4 +75,12 @@ warns on a `produces:` path its unit never mentions.
 **Verification.** `specfuse lint --closing`, plus the gate set in `.specfuse/verification.yml`.
 
 **Escalation triggers.** A surviving skip, or an early refusal whose outcome or failure class
-differs from the late one for the same input: record `not_met` with a follow-up.
+differs from the late one for the same input, other than the deliverable-over-
+`files_changed_mismatch` precedence `GATE-01.md` states (#3608): record `not_met` with a
+follow-up.
+
+**Re-close note (2026-11-26).** The first close recorded `not_met` on #3608 and #3609; the
+operator chose to amend the definition of done for both (see `GATE-01.md` clause 6 and
+"Precedence when two refusals apply"). That close already wrote `RETROSPECTIVE.md`,
+`FOLLOW-UPS.md`, `LEARNINGS-pending.md` and changelog fragments: update them in place, do not
+duplicate fragments, and say in `FOLLOW-UPS.md` whether each entry's re-run condition now holds.

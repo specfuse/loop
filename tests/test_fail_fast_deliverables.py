@@ -130,6 +130,40 @@ class TestProducesNotInDiffEarly(_Case):
         self.assertEqual(outcome, "passed")
         self.assertEqual(calls, [T01])
 
+    def test_deliverable_refusal_outranks_files_changed_mismatch(self):
+        """GATE-01.md precedence (#3608): a RESULT that claims an untouched
+        declared path trips both guards; the default order names the
+        deliverable refusal, the opt-out keeps the old post-verify name."""
+        claim = ("```result\nstatus: complete\nfiles_changed:\n"
+                 "  - docs/notes.md\n  - src/rule.py\n```\n")
+        _, outcome, _, _, calls = self._attempt("docs/notes.md", claim)
+        self.assertEqual(outcome, "produces_not_in_diff")
+        self.assertEqual(calls, [])
+        os.chdir(self._cwd)
+
+        _, fdir = self._workspace()
+        wu = loop.load_wu(fdir, {"id": T01, "file": "WU-T01.md",
+                                 "depends_on": []})
+        head = _git("rev-parse", "HEAD")
+        late_calls = []
+
+        def dispatch_fn(w, note):
+            Path("docs").mkdir(exist_ok=True)
+            Path("docs/notes.md").write_text("changed\n")
+            return claim
+
+        def verify_fn(w, fd):
+            late_calls.append(w.wu_id)
+            return True, "(stub)"
+
+        outcome, _, _ = loop.execute_unit_attempt(
+            wu, fdir, None, dispatch_fn=dispatch_fn, verify_fn=verify_fn,
+            cost_tracking=False, head_before=head,
+            prerun_cfg={"defaults": {"fail_fast_deliverables": False}},
+            untracked_before=loop.untracked_paths())
+        self.assertEqual(outcome, "files_changed_mismatch")
+        self.assertEqual(late_calls, [T01])
+
     def test_justified_path_still_verifies(self):
         _, outcome, _, _, calls = self._attempt(
             "docs/notes.md",

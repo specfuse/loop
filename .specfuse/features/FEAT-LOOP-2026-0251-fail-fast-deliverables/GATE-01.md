@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_fail_fast_deliverables -v -b"
 cost_budget_usd: 14.00
 broad_run:
@@ -33,8 +33,18 @@ leaves a known diff and a `verify_fn` that counts its calls:
 5. **Arm-time warning.** `specfuse lint` prints a WARN for a dispatchable unit whose `produces:`
    path appears nowhere in its body, by full path or file name, and stays silent when it does.
 6. **Nothing else changes.** Every existing test of the three guards passes unchanged, apart
-   from assertions on the order of `verify` and the guard, which are updated and named in the
-   close.
+   from assertions on the order of `verify` and the guard, and edits forced by moving code into
+   a shared helper or by new lint wording that a text-matching assertion picks up. No such edit
+   removes or weakens an assertion, and each is named in the close. *(Widened 2026-11-26 by the
+   operator after the first close, #3609.)*
+
+**Precedence when two refusals apply** *(stated 2026-11-26 by the operator after the first
+close, #3608).* An attempt whose RESULT claims a declared `produces:` path it did not change
+trips both `produces_not_in_diff` and `files_changed_mismatch`. Under the default order the
+deliverable refusal wins and verification does not run; with `fail_fast_deliverables: false`
+the old `files_changed_mismatch` outcome holds. Both sides are asserted by
+`TestProducesNotInDiffEarly.test_deliverable_refusal_outranks_files_changed_mismatch`.
+Clause 3's "same outcome and failure class" applies to inputs that trip only one refusal.
 
 The `feature_oracle` proves 1–5. It is red on the current tree; `FEAT-LOOP-2026-0251/T01` is the
 walking skeleton that creates `tests/test_fail_fast_deliverables.py` and turns clause 1 green,
