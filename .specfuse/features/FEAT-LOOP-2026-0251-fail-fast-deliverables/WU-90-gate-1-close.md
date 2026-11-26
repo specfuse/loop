@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0251/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -16,7 +16,7 @@ judge_edit_acknowledged:
     - specfuse/loop/lint_plan.py
     - specfuse/loop/loop.py
   reason: "Review fixes tested, full suite green, accept the generator risk"
-re_arm_count: 4
+re_arm_count: 5
 re_arm_history:
   -
     timestamp: 2026-11-26T13:30:05+00:00
@@ -46,6 +46,13 @@ re_arm_history:
     prior_cost_usd: 1.733084
     prior_duration_seconds: 379.569
     reason: "Trying to fix the last issue"
+  -
+    timestamp: 2026-11-26T16:44:22+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.435437
+    prior_duration_seconds: 478.949
+    reason: "Fixed the deleted-file edge case, re-close it"
 cumulative_cost_usd: 4.915036
 cumulative_duration_seconds: 930.426
 cumulative_input_tokens: 174
@@ -56,7 +63,6 @@ duration_seconds: 478.949
 input_tokens: 62
 output_tokens: 35593
 folded_through_re_arm: 4
-verdict: not_met
 gate_set: plannext
 driver_version: 0.33.2
 started_at: 2026-11-26T16:17:14.747069+00:00
@@ -112,3 +118,9 @@ the tree kept, a later attempt's retry note listed the earlier attempt's kept ed
 (clause 4). Fixed on the branch (`snapshot_dirty_tree`, `attempt_own_paths` in `loop.py`; tests
 in `TestTreeAndNote`; see `PLAN.md` Notes). Update the closing files in place as before, and say
 in `FOLLOW-UPS.md` whether #3612's re-run condition now holds.
+
+**Fourth re-close note (2026-11-26).** The fourth close recorded `not_met` on #3613: a kept file
+the attempt deleted or reverted was missing from its retry note. Fixed on the branch
+(`attempt_own_paths` in `loop.py`; tests in `TestTreeAndNote`; see `PLAN.md` Notes). Update the
+closing files in place as before, and say in `FOLLOW-UPS.md` whether #3613's re-run condition
+now holds.
