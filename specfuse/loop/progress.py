@@ -16,6 +16,9 @@ a gate set or an attempt outside `run()` writes nothing.
 `build_event` and `flush_events` are passed in by the driver: it imports this
 module, so this module does not import it.
 
+`watch` is the `specfuse-loop --watch` reader, run from a second terminal. It
+only reads the status file: it takes no run lock and writes nothing.
+
 Reports only; no merge, arm or close verdict reads anything written here.
 """
 
@@ -24,6 +27,8 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import shutil
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -120,9 +125,12 @@ def _append_event(event_type: str, payload: dict) -> None:
         event_type, run.wu_id or run.feature, payload)])
 
 
+def _plain(text: str) -> str:
+    return "".join(c if c.isprintable() else " " for c in text)
+
+
 def _say(text: str) -> None:
-    plain = "".join(c if c.isprintable() else " " for c in text)
-    print(f"   [{time.strftime('%H:%M:%S')}] {plain}", flush=True)
+    print(f"   [{time.strftime('%H:%M:%S')}] {_plain(text)}", flush=True)
 
 
 def begin_run(
@@ -255,3 +263,96 @@ def gate_finished(name: str, ok: bool, duration_seconds: float) -> None:
         "attempt": _run.attempt, "gate": name, "ok": bool(ok),
         "duration_seconds": duration_seconds})
     _say(f"gate {name} {'PASS' if ok else 'FAIL'} ({duration_seconds:.1f}s)")
+
+
+# A watcher is stale after this many heartbeat intervals without a rewrite.
+_STALE_INTERVALS = 3
+_WATCH_POLL_SECONDS = 1.0
+
+
+def _read_status(path: Path) -> "dict | None":
+    try:
+        status = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return status if isinstance(status, dict) else None
+
+
+def _age_seconds(status: dict) -> "float | None":
+    try:
+        updated = dt.datetime.fromisoformat(status["updated_at"])
+        return (dt.datetime.now(dt.timezone.utc) - updated).total_seconds()
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _watch_line(status: dict, stale_age: "float | None") -> str:
+    attempt = "-"
+    if status.get("attempt") is not None:
+        attempt = f"{status['attempt']}/{status.get('max_attempts')}"
+    elapsed = status.get("elapsed_seconds")
+    elapsed = f"{int(elapsed)}s" if isinstance(elapsed, (int, float)) else "-"
+    line = (f"{status.get('wu_id') or status.get('feature')}  "
+            f"attempt {attempt}  phase {status.get('phase')}  "
+            f"gate {status.get('gate') or '-'}  elapsed {elapsed}")
+    if stale_age is not None:
+        # First, so cutting the line to the terminal width keeps it.
+        line = f"no update for {int(stale_age)}s  {line}"
+    return _plain(line)
+
+
+def watch(feature_dir: Path, heartbeat_seconds: float) -> int:
+    """Follow the status file of *feature_dir* until its phase is `stopped`.
+
+    On a terminal one line is redrawn in place. Otherwise a line is printed
+    when the unit, attempt, phase or gate changes, and once each time the file
+    goes stale. Returns 0 when the run stopped, 1 when there is no status file,
+    130 on Ctrl-C.
+    """
+    path = status_path(feature_dir)
+    out = sys.stdout
+    tty = out.isatty()
+    shown = None
+    drawn = 0
+    try:
+        while True:
+            status = _read_status(path)
+            if status is None:
+                if not path.is_file():
+                    if drawn:
+                        out.write("\n")
+                    print(f"No status file at {path}. `specfuse-loop` writes "
+                          f"it while it runs this feature.", file=sys.stderr)
+                    return 1
+                time.sleep(_WATCH_POLL_SECONDS)
+                continue
+            stopped = status.get("phase") == PHASE_STOPPED
+            age = _age_seconds(status)
+            stale = (not stopped and age is not None
+                     and age > _STALE_INTERVALS * heartbeat_seconds)
+            line = _watch_line(status, age if stale else None)
+            if tty:
+                width = max(shutil.get_terminal_size().columns - 1, 1)
+                text = line[:width]
+                # Padding covers a longer previous line without ANSI codes.
+                out.write("\r" + text.ljust(min(drawn, width)))
+                out.flush()
+                drawn = len(text)
+            else:
+                key = tuple(status.get(k) for k in (
+                    "wu_id", "attempt", "phase", "gate")) + (stale,)
+                # Leaving the stale state alone is not a change to report.
+                if key != shown and not (
+                        shown and shown[-1] and not stale
+                        and key[:-1] == shown[:-1]):
+                    print(line, file=out, flush=True)
+                shown = key
+            if stopped:
+                if tty:
+                    out.write("\n")
+                return 0
+            time.sleep(_WATCH_POLL_SECONDS)
+    except KeyboardInterrupt:
+        if drawn:
+            out.write("\n")
+        return 130

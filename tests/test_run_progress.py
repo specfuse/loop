@@ -14,12 +14,14 @@ attempt runs is read from inside the attempt, never compared afterwards.
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import importlib.resources
 import io
 import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -402,12 +404,161 @@ class TestHeartbeat(unittest.TestCase):
                     {"defaults": {"heartbeat_seconds": value}}), expected)
 
 
-@unittest.skip("FEAT-LOOP-2026-0252/T03")
-class TestWatch(unittest.TestCase):
-    """Clause 5 — owned by T03."""
+def _status(age_seconds=0.0, **changes) -> dict:
+    updated = dt.datetime.now(dt.timezone.utc) - dt.timedelta(
+        seconds=age_seconds)
+    status = {
+        "feature": FEATURE_ID, "wu_id": WU_ID, "attempt": 1,
+        "max_attempts": 3, "phase": "agent", "gate": None,
+        "started_at": updated.isoformat(), "updated_at": updated.isoformat(),
+        "elapsed_seconds": 12.4, "files_touched": [], "stop_reason": None,
+    }
+    status.update(changes)
+    return status
 
-    def test_placeholder(self):
-        self.fail("T03 replaces this class")
+
+class _Tty(io.StringIO):
+    def isatty(self):
+        return True
+
+
+class TestWatch(unittest.TestCase):
+    """Clause 5 — `specfuse-loop --watch`."""
+
+    def _watch(self, statuses, *, out=None, argv=("--watch",), heartbeat=None):
+        """`main()` over a status file that is rewritten with the next of
+        *statuses* each time the watcher waits."""
+        out = io.StringIO() if out is None else out
+        err = io.StringIO()
+        with integration_workspace() as root, \
+                tempfile.TemporaryDirectory() as snapshots:
+            cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                fdir = _scaffold(root, Path(snapshots))
+                if heartbeat is not None:
+                    with (root / ".specfuse/verification.yml").open("a") as fh:
+                        fh.write(
+                            f"defaults:\n  heartbeat_seconds: {heartbeat}\n")
+                path = fdir / "work" / "STATUS.json"
+                pending = list(statuses)
+
+                def rewrite():
+                    path.parent.mkdir(exist_ok=True)
+                    path.write_text(json.dumps(pending.pop(0)))
+
+                if pending:
+                    rewrite()
+
+                def sleep(_seconds):
+                    if not pending:
+                        raise AssertionError(
+                            "watch kept waiting: " + out.getvalue())
+                    rewrite()
+
+                def tree():
+                    return {p: p.read_bytes() for p in root.rglob("*")
+                            if p.is_file() and ".git" not in p.parts
+                            and p.name != "STATUS.json"}
+
+                before = tree()
+                with mock.patch.object(sys, "argv", ["specfuse-loop", *argv]), \
+                        mock.patch.object(time, "sleep", sleep), \
+                        mock.patch.object(loop, "acquire_tree_lock") as lock, \
+                        mock.patch.object(loop, "auto_sync") as sync, \
+                        mock.patch.object(loop, "run") as run, \
+                        contextlib.redirect_stdout(out), \
+                        contextlib.redirect_stderr(err):
+                    rc = loop.main()
+                for untouched in (lock, sync, run):
+                    untouched.assert_not_called()
+                self.assertEqual(tree(), before)
+            finally:
+                os.chdir(cwd)
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_line_names_unit_attempt_phase_elapsed_and_gate(self):
+        rc, out, _ = self._watch([
+            _status(phase="gate", gate="alpha"),
+            _status(phase="stopped"),
+        ])
+        self.assertEqual(rc, 0)
+        first = out.splitlines()[0]
+        for part in (WU_ID, "attempt 1/3", "phase gate", "gate alpha",
+                     "elapsed 12s"):
+            self.assertIn(part, first)
+        self.assertNotIn("no update", out)
+        self.assertNotIn("\r", out)
+        self.assertNotIn("\x1b", out)
+
+    def test_prints_only_on_unit_attempt_phase_or_gate_change(self):
+        rc, out, _ = self._watch([
+            _status(),
+            _status(elapsed_seconds=42.0, files_touched=["a.txt"]),
+            _status(phase="gate", gate="alpha"),
+            _status(phase="gate", gate="beta"),
+            _status(attempt=2),
+            _status(attempt=2, wu_id=f"{FEATURE_ID}/T02"),
+            _status(phase="stopped"),
+        ])
+        self.assertEqual(rc, 0)
+        lines = out.splitlines()
+        self.assertEqual(len(lines), 6, out)
+        self.assertIn("phase agent", lines[0])
+        self.assertIn("gate alpha", lines[1])
+        self.assertIn("gate beta", lines[2])
+        self.assertIn("attempt 2/3", lines[3])
+        self.assertIn("/T02", lines[4])
+        self.assertIn("phase stopped", lines[5])
+
+    def test_stale_status_says_no_update_once(self):
+        rc, out, _ = self._watch([
+            _status(age_seconds=100),
+            _status(age_seconds=101),
+            _status(phase="stopped"),
+        ])
+        self.assertEqual(rc, 0)
+        stale = [ln for ln in out.splitlines() if "no update for" in ln]
+        self.assertEqual(len(stale), 1, out)
+        self.assertRegex(stale[0], r"no update for 10\ds")
+
+    def test_staleness_is_three_configured_heartbeat_intervals(self):
+        for age, expected in ((20, False), (40, True)):
+            with self.subTest(age=age):
+                _, out, _ = self._watch(
+                    [_status(age_seconds=age), _status(phase="stopped")],
+                    heartbeat=10)
+                self.assertEqual("no update for" in out, expected, out)
+
+    def test_old_stopped_status_is_not_stale(self):
+        rc, out, _ = self._watch([_status(age_seconds=500, phase="stopped")])
+        self.assertEqual(rc, 0)
+        self.assertNotIn("no update", out)
+
+    def test_terminal_redraws_one_line_in_place(self):
+        rc, out, _ = self._watch([
+            _status(),
+            _status(elapsed_seconds=42.0),
+            _status(phase="stopped"),
+        ], out=_Tty())
+        self.assertEqual(rc, 0)
+        self.assertEqual(out.count("\n"), 1, repr(out))
+        self.assertTrue(out.endswith("\n"))
+        self.assertEqual(out.count("\r"), 3, repr(out))
+        self.assertIn("elapsed 42s", out)
+
+    def test_feature_argument_resolves_a_bare_id(self):
+        rc, out, _ = self._watch(
+            [_status(phase="stopped")],
+            argv=("--watch", "--feature", FEATURE_ID))
+        self.assertEqual(rc, 0)
+        self.assertIn(WU_ID, out)
+
+    def test_no_status_file_names_the_expected_path(self):
+        rc, _, err = self._watch([])
+        self.assertEqual(rc, 1)
+        self.assertIn(
+            f".specfuse/features/{FEATURE_ID}-{SLUG}/work/STATUS.json", err)
 
 
 @unittest.skip("FEAT-LOOP-2026-0252/T04")

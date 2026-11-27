@@ -15026,6 +15026,10 @@ def main() -> int:
     ap.add_argument("--feature", help="Feature dir name or bare FEAT-ID (e.g. "
                     "FEAT-2026-0039) under .specfuse/features/ "
                     "(optional if exactly one feature is active).")
+    ap.add_argument("--watch", action="store_true",
+                    help="Follow a running driver's progress from a second "
+                    "terminal, for --feature or the single active feature. "
+                    "Reads the status file only; runs and writes nothing.")
     ap.add_argument("--dry-run", action="store_true",
                     help="Walk the current gate without dispatching or writing.")
     ap.add_argument("--force-full-close", metavar="FEATURE_ID",
@@ -15061,6 +15065,12 @@ def main() -> int:
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
+
+    # Before the build pin and auto_sync: both write, and the watcher must not.
+    if args.watch:
+        return _progress.watch(
+            find_feature(args.feature),
+            resolve_heartbeat_seconds(load_verification()))
 
     # Build-pin re-entry (FEAT-2026-0109/T08): after argparse (so `--help`
     # and a bad flag exit here, in-process, without ever touching a pin) and

@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0252/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - specfuse/loop/progress.py
@@ -12,6 +12,13 @@ produces_driver_helper:
   - main
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T03:15:51.138811+00:00
+duration_seconds: 137.331
+cost_usd: 0.446936
+input_tokens: 24
+output_tokens: 11063
 ---
 
 # T03 — `specfuse-loop --watch`
