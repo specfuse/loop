@@ -13294,6 +13294,18 @@ def run(
                     blocked = True
                     continue
 
+                # Fold the prior cycle's cost before head_before is taken, and
+                # commit it: written after head_before, a failed attempt's
+                # `git reset --hard head_before` erased the fold, and a cycle
+                # that then ended blocked lost the prior cycle's spend (#3552).
+                _is_rearm = detect_rearm_dispatch(wu)
+                if _is_rearm:
+                    fold_cumulative_on_rearm(wu, backend)
+                    commit_bookkeeping(
+                        [wu.file],
+                        f"chore(loop): {wu.wu_id} fold re-armed cycle cost"
+                        f"\n\nFeature: {feature_id}",
+                    )
                 head_before = git("rev-parse", "HEAD")
                 # Snapshot the operator's untracked files alongside head_before:
                 # squash_commit must not absorb WIP that pre-dates this dispatch
@@ -13307,9 +13319,6 @@ def run(
                 # build output is already indistinguishable from what was
                 # on disk when it started.
                 ignored_before = ignored_paths()
-                _is_rearm = detect_rearm_dispatch(wu)
-                if _is_rearm:
-                    fold_cumulative_on_rearm(wu, backend)
                 backend.set_wu(wu, "status", "in_progress")
                 # Stamp the resolved execution metadata into the WU frontmatter so
                 # it is visible when you read the .md (not only on the console /
