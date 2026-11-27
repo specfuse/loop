@@ -3094,12 +3094,16 @@ def untracked_paths() -> set[str]:
     Snapshotted per-WU immediately before dispatch so `squash_commit` can tell
     "the operator already had this file" from "this run created it" — only the
     latter belongs in the WU's commit. See issue #150 and `squash_commit`.
+
+    Read NUL-separated (`-z`): line output C-quotes a non-ASCII name under
+    git's default `core.quotePath`, and a quoted name passed back to git as a
+    pathspec matches nothing (#3616).
     """
     out = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
         capture_output=True, text=True, check=True,
     ).stdout
-    return {line.strip() for line in out.splitlines() if line.strip()}
+    return {p for p in out.split("\0") if p}
 
 
 def _path_state(path: str) -> "tuple[int, str] | None":
