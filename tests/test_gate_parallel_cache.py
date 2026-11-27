@@ -7,15 +7,20 @@ concurrency is read from recorded intervals, never from total wall time.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import os
 import re
 import shlex
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from specfuse.loop import loop
+from specfuse.loop import loop, progress
 
 _STUB = """\
 import sys, time
@@ -28,6 +33,33 @@ time.sleep(float(seconds))
 record("end")
 print("output of " + name)
 sys.exit(int(code))
+"""
+
+# Records its process group, then hangs with a child in that group.
+_HANG_STUB = """\
+import os, subprocess, sys, time
+open(sys.argv[1], "w").write(str(os.getpgrp()))
+subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+time.sleep(5)
+"""
+
+# Reads the status file until it names both gates, then saves what it read.
+_STATUS_STUB = """\
+import json, sys, time
+status_path, seen_path = sys.argv[1:3]
+deadline = time.time() + 10
+status = {}
+while time.time() < deadline:
+    try:
+        with open(status_path) as fh:
+            status = json.load(fh)
+    except (OSError, ValueError):
+        pass
+    if {"reader", "other"} <= set(status.get("gates_running", [])):
+        break
+    time.sleep(0.02)
+with open(seen_path, "w") as fh:
+    json.dump(status, fh)
 """
 
 _SLEEP = 0.6
@@ -225,10 +257,111 @@ class TestResultOrder(_StubGates):
             ["slow", "fast"])
 
 
-@unittest.skip("FEAT-LOOP-2026-0253/T02")
-class TestParallelSafety(unittest.TestCase):
-    def test_pending(self):
-        self.fail("not implemented")
+class TestParallelSafety(_StubGates):
+    def report_progress(self):
+        """Run progress reporting into a real feature folder."""
+        self.feature_dir = self.tmp / "feature"
+        self.feature_dir.mkdir()
+        self.events_path = self.feature_dir / "events.jsonl"
+        quiet = contextlib.redirect_stdout(io.StringIO())
+        quiet.__enter__()
+        self.addCleanup(quiet.__exit__, None, None, None)
+        progress.begin_run(
+            "FEAT-2026-9001", self.feature_dir, self.events_path,
+            build_event=loop.build_event, flush_events=loop.flush_events)
+        self.addCleanup(progress.end_run)
+
+    def status(self):
+        return json.loads(progress.status_path(self.feature_dir).read_text())
+
+    def script(self, name, source, *args):
+        path = self.tmp / f"{name}.py"
+        path.write_text(source)
+        return {"name": name, "command": shlex.join(
+            [Path(sys.executable).as_posix(), path.as_posix(),
+             *(Path(a).as_posix() for a in args)])}
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX process groups")
+    def test_a_timeout_kills_its_group_while_the_others_pass(self):
+        pgid_file = self.tmp / "pgid"
+        gates = [self.script("hang", _HANG_STUB, pgid_file),
+                 self.gate("a", seconds=0.2), self.gate("b", seconds=0.2)]
+        with mock.patch.object(loop, "GATE_TIMEOUT_SECONDS", 1):
+            results = loop._run_gate_set(
+                gates, self.feature_dir, max_parallel=3)
+        self.assertEqual([r["ok"] for r in results], [False, True, True],
+                         results)
+        self.assertIn("GATE TIMEOUT: exceeded 1s and was killed",
+                      results[0]["report"])
+        pgid = int(pgid_file.read_text())
+        deadline = time.monotonic() + 2
+        # The orphaned child stays in the group until it is reaped.
+        with self.assertRaises(ProcessLookupError):
+            while time.monotonic() < deadline:
+                os.killpg(pgid, 0)
+                time.sleep(0.02)
+
+    def test_each_parallel_gate_writes_each_event_once_on_whole_lines(self):
+        self.report_progress()
+        names = ["a", "b", "c", "d"]
+
+        def torn_flush(path, events):
+            """Write each line in two halves, so unserialised writers mix."""
+            for event in events:
+                line = json.dumps(event) + "\n"
+                for part in (line[:20], line[20:]):
+                    with path.open("a") as fh:
+                        fh.write(part)
+                    time.sleep(0.01)
+
+        progress._run.flush_events = torn_flush
+        loop._run_gate_set(
+            [self.gate(n, seconds=0.2) for n in names], self.feature_dir,
+            max_parallel=4)
+        events = [json.loads(line)
+                  for line in self.events_path.read_text().splitlines()]
+        for event_type in ("gate_started", "gate_finished"):
+            self.assertEqual(
+                sorted(e["payload"]["gate"] for e in events
+                       if e["event_type"] == event_type), names, event_type)
+        self.assertEqual(len(events), 2 * len(names))
+        self.assertEqual(self.status()["gates_running"], [])
+
+    def test_the_status_file_names_every_running_gate(self):
+        self.report_progress()
+        seen = self.tmp / "seen.json"
+        gates = [
+            self.script("reader", _STATUS_STUB,
+                        progress.status_path(self.feature_dir), seen),
+            self.gate("other", seconds=2),
+        ]
+        loop._run_gate_set(gates, self.feature_dir, max_parallel=2)
+        status = json.loads(seen.read_text())
+        self.assertEqual(status["phase"], "gate")
+        self.assertEqual(sorted(status["gates_running"]), ["other", "reader"])
+        self.assertEqual(status["gate"], status["gates_running"][-1])
+        after = self.status()
+        self.assertEqual(
+            (after["phase"], after["gate"], after["gates_running"]),
+            ("between", None, []))
+
+    def test_gate_stays_the_latest_started_gate_still_running(self):
+        self.report_progress()
+        self.assertEqual(self.status_after(progress.gate_started, "a"),
+                         ("gate", "a", ["a"]))
+        self.assertEqual(self.status_after(progress.gate_started, "b"),
+                         ("gate", "b", ["a", "b"]))
+        self.assertEqual(
+            self.status_after(progress.gate_finished, "b", True, 0.1),
+            ("gate", "a", ["a"]))
+        self.assertEqual(
+            self.status_after(progress.gate_finished, "a", True, 0.1),
+            ("between", None, []))
+
+    def status_after(self, call, *args):
+        call(*args)
+        status = self.status()
+        return status["phase"], status["gate"], status["gates_running"]
 
 
 @unittest.skip("FEAT-LOOP-2026-0253/T03")

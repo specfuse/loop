@@ -7246,7 +7246,8 @@ def _run_gate_set(
     is ready once every gate it `needs` has ended; among ready gates the one
     earliest in *gate_set* starts first. At 1 each gate runs on the calling
     thread, in *gate_set* order. Results are in *gate_set* order whatever the
-    finishing order. Only a `needs` edge to a gate earlier in *gate_set* is
+    finishing order. Each gate keeps its own timeout and process group, so one
+    timing out does not stop the others. Only a `needs` edge to a gate earlier in *gate_set* is
     waited on, which in an `order_gate_set` order is every edge in the set.
 
     `_capture_returncodes` (FEAT-2026-0101/T05) is an optional out-parameter:

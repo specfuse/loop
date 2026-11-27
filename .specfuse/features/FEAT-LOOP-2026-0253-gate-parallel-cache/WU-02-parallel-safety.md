@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0253/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/loop.py
@@ -12,6 +12,13 @@ produces_driver_helper:
   - _run_gate_set
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T04:42:53.181834+00:00
+duration_seconds: 185.384
+cost_usd: 0.42244
+input_tokens: 20
+output_tokens: 10813
 ---
 
 # T02 — timeouts, events and the status file under parallel gates
