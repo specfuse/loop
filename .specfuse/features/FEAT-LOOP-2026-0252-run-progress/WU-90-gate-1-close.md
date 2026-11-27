@@ -32,10 +32,10 @@ cumulative_duration_seconds: 0.0
 cumulative_input_tokens: 0
 cumulative_output_tokens: 0
 cumulative_attempts: 0
-cost_usd: 1.47429
+cost_usd: 1.889367
 duration_seconds: 409.775
-input_tokens: 54
-output_tokens: 40064
+input_tokens: 68
+output_tokens: 44336
 folded_through_re_arm: 1
 gate_set: plannext
 driver_version: 0.33.2
