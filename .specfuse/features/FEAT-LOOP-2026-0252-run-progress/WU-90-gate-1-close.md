@@ -38,10 +38,10 @@ cumulative_duration_seconds: 409.775
 cumulative_input_tokens: 68
 cumulative_output_tokens: 44336
 cumulative_attempts: 1
-cost_usd: 0.824111
+cost_usd: 1.46683
 duration_seconds: 276.577
-input_tokens: 32
-output_tokens: 21082
+input_tokens: 50
+output_tokens: 30666
 folded_through_re_arm: 2
 gate_set: plannext
 verdict: met
