@@ -7,3 +7,5 @@
   - note: Close should note that every non-dry-run return from main()'s run() call notifies (including --prepare-only and a refused lock, which leaves the other driver's STATUS.json alone), and that quiet_hours gates only the webhook, not notify_command.
 - **FEAT-LOOP-2026-0252/G1-CLOSE**: Terminal close recorded verdict not_met because the stop reason is wrong when events.jsonl changes under run() (reproduced in both directions with a simulated checkout); wrote the retrospective, one follow-up, one staged lesson, four changelog fragments and the state of all 17 criteria (disclosure - one read-only git ls-files was run early in the session, against the no-git rule).
   - note: Fix where the events offset is taken relative to ensure_feature_branch (also check --prepare and --prepare-only), and test it through loop.main() with a real checkout between branches whose events.jsonl files differ.
+- **FEAT-LOOP-2026-0252/G1-CLOSE**: Re-closed gate 1 with advisory verdict met after the
+  - note: PLAN.md's post-merge checklist has no real-driver-crash line, and the timestamp-based event selection has an untested wall-clock limit.

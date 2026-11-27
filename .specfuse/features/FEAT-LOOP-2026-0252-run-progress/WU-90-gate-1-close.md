@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0252/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 model: sonnet
@@ -33,19 +33,20 @@ re_arm_history:
     prior_cost_usd: 1.889367
     prior_duration_seconds: 409.775
     reason: "Fixed the stop-reason offset, re-close it"
-cumulative_cost_usd: 0.0
-cumulative_duration_seconds: 0.0
-cumulative_input_tokens: 0
-cumulative_output_tokens: 0
-cumulative_attempts: 0
-cost_usd: 1.889367
-duration_seconds: 409.775
-input_tokens: 68
-output_tokens: 44336
-folded_through_re_arm: 1
+cumulative_cost_usd: 1.889367
+cumulative_duration_seconds: 409.775
+cumulative_input_tokens: 68
+cumulative_output_tokens: 44336
+cumulative_attempts: 1
+cost_usd: 0.824111
+duration_seconds: 276.577
+input_tokens: 32
+output_tokens: 21082
+folded_through_re_arm: 2
 gate_set: plannext
+verdict: met
 driver_version: 0.33.2
-started_at: 2026-11-27T03:36:06.127327+00:00
+started_at: 2026-11-27T04:17:54.347623+00:00
 ---
 
 # G1-CLOSE — terminal close

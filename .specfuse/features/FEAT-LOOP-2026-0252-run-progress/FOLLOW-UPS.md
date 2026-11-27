@@ -1,6 +1,8 @@
 # Follow-ups — FEAT-LOOP-2026-0252
 
-First close of gate 1. One entry is open.
+First close of gate 1 wrote one entry. **Re-close, 2026-11-26: #3626's re-run condition
+now holds. No entry is open.** The entry stays below as the record; its result is at the
+end of it. This unit did not change the issue on GitHub.
 
 ### Definition of done clause 6 (stop reason when the event log changes during `run()`)
 
@@ -54,3 +56,17 @@ existing `TestStopNotification` tests stay green.
 early one for returns that happen before that. Check the `--prepare` and `--prepare-only`
 paths, which also switch branches, and the `driver_build_pinned` line written before the
 switch.
+
+**Re-run result (re-close): condition holds.**
+
+- Real checkout through `loop.main()`, run starting off the feature branch, two differing
+  logs. (a) `test_checkout_bringing_an_older_escalation_is_not_read` reports
+  `awaiting_review`. (b) `test_checkout_to_a_shorter_log_still_reads_this_runs_events`
+  starts with the longer log, reports `halted` and names the halted unit.
+- `python3 -m unittest tests.test_run_progress -v -b`: exit 0, `Ran 38 tests`, `OK`. This
+  includes all of `TestStopNotification`.
+- Control: with the byte-offset reader restored in a temporary copy,
+  `TestStopNotification` gives `FAILED (failures=2)`, those two tests
+  (`'halted' != 'awaiting_review'`, `'stopped' != 'halted'`).
+- The fix differs from the "possible fix" above: events are selected by timestamp, not by
+  an offset taken later.
