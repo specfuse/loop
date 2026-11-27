@@ -6692,6 +6692,16 @@ _BLOCKING_VERDICT_LINE_RE = re.compile(
     r"^[\s*_]*Verdict[\s*_]*[:.]\s*[\s*_]*" + _BLOCKING_VERDICT_TOKENS + r"\b",
     re.IGNORECASE,
 )
+#: The same line under the other labels an agent reaches for (#3607:
+#: `**Outcome: BLOCKED.**` passed the guard). Any case for the label, but the
+#: token must be uppercase, so prose such as "Status: incomplete migrations
+#: are listed below" does not fire.
+_BLOCKING_OUTCOME_LINE_RE = re.compile(
+    r"^[\s*_]*(?i:Outcome|Result|Status|Conclusion)[\s*_]*[:.]\s*[\s*_]*"
+    + _BLOCKING_VERDICT_TOKENS + r"\b"
+)
+#: A Markdown code-fence delimiter: quoted logs are evidence, not the verdict.
+_CODE_FENCE_RE = re.compile(r"^(`{3,}|~{3,})")
 
 #: Unit types whose deliverable legitimately carries a `not_met` or blocking
 #: verdict while the RESULT reads `complete`: a close writes the feature's
@@ -6705,7 +6715,9 @@ _VERDICT_GUARD_EXEMPT_TYPES = frozenset({
 
 def find_produced_verdict_contradiction(wu: "WorkUnit") -> "tuple[str, str] | None":
     """The first (path, line) among *wu*'s produced Markdown files whose
-    heading or `Verdict:` line carries a blocking verdict (#3293), or None.
+    heading, `Verdict:` line, or `Outcome:` / `Result:` / `Status:` /
+    `Conclusion:` line carries a blocking verdict (#3293, #3607), or None.
+    Lines inside a fenced code block are skipped.
 
     FEAT-2026-0167/T04 (generator) produced `CONSUMER-VERIFICATION.md` with
     the heading `## Verdict: BLOCKED — ...` and reported `status: complete`.
@@ -6726,10 +6738,22 @@ def find_produced_verdict_contradiction(wu: "WorkUnit") -> "tuple[str, str] | No
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        fence = None
         for line in text.splitlines():
             stripped = line.strip()
+            opener = _CODE_FENCE_RE.match(stripped)
+            if fence is not None:
+                if opener and opener.group(1)[0] == fence[0] \
+                        and len(opener.group(1)) >= len(fence) \
+                        and stripped == opener.group(1):
+                    fence = None
+                continue
+            if opener:
+                fence = opener.group(1)
+                continue
             if (_BLOCKING_VERDICT_HEADING_RE.match(stripped)
-                    or _BLOCKING_VERDICT_LINE_RE.match(stripped)):
+                    or _BLOCKING_VERDICT_LINE_RE.match(stripped)
+                    or _BLOCKING_OUTCOME_LINE_RE.match(stripped)):
                 return rel, stripped
     return None
 
