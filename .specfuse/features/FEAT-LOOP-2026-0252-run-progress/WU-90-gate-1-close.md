@@ -1,8 +1,9 @@
 ---
 id: FEAT-LOOP-2026-0252/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+verdict: not_met
 planned_cost_usd: 5.00
 auto_close_disabled: true
 model: sonnet
@@ -26,6 +27,19 @@ re_arm_history:
     prior_cost_usd: 0.0
     prior_duration_seconds: 0.0
     reason: "Driver changes reviewed and sound, accept them"
+cumulative_cost_usd: 0.0
+cumulative_duration_seconds: 0.0
+cumulative_input_tokens: 0
+cumulative_output_tokens: 0
+cumulative_attempts: 0
+cost_usd: 1.47429
+duration_seconds: 409.775
+input_tokens: 54
+output_tokens: 40064
+folded_through_re_arm: 1
+gate_set: plannext
+driver_version: 0.33.2
+started_at: 2026-11-27T03:36:06.127327+00:00
 ---
 
 # G1-CLOSE — terminal close
