@@ -7221,10 +7221,85 @@ def _run_gate(
     }
 
 
+def gate_cache_key(gate: dict) -> "str | None":
+    """The key a PASS of *gate* may be reused under (FEAT-LOOP-2026-0253/T03):
+    SHA-256 over its command and the sorted (path, file mode, content digest)
+    of every tracked or untracked, non-ignored file on disk that its `inputs:`
+    pathspecs match.
+
+    None -- never cached -- for a gate without `inputs:`, and whenever the
+    files cannot all be read: git fails, or a match is not a file or symlink
+    (a submodule, whose content this listing cannot see).
+    """
+    inputs = gate.get("inputs")
+    if not (isinstance(inputs, list) and inputs
+            and all(isinstance(spec, str) and spec for spec in inputs)):
+        return None
+    try:
+        listed = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--others",
+             "--exclude-standard", "--", *inputs],
+            capture_output=True, check=True,
+        ).stdout
+        files = []
+        for raw in sorted(set(listed.split(b"\0")) - {b""}):
+            path = os.fsdecode(raw)
+            try:
+                mode = os.lstat(path).st_mode
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(mode):
+                content = os.fsencode(os.readlink(path))
+            elif stat.S_ISREG(mode):
+                content = Path(path).read_bytes()
+            else:
+                return None
+            files.append((path, mode, hashlib.sha256(content).hexdigest()))
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    payload = json.dumps([gate["command"], files])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _read_gate_cache(path: Path) -> dict:
+    """The stored `{gate name: key}` of each PASS; empty when unreadable."""
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return entries if isinstance(entries, dict) else {}
+
+
+def _write_gate_cache(path: Path, entries: dict) -> None:
+    """Replace the cache file; a failed write only costs a later rerun."""
+    # As in `persist_gate_output`: no work/ tree under a placeholder folder.
+    if not path.parent.parent.is_dir():
+        return
+    try:
+        path.parent.mkdir(exist_ok=True)
+        staged = path.with_name(path.name + ".tmp")
+        staged.write_text(json.dumps(entries, indent=2), encoding="utf-8")
+        os.replace(staged, path)
+    except OSError:
+        pass
+
+
+def _cached_gate_result(name: str) -> dict:
+    """The result of a gate not run because its stored PASS still applies."""
+    return {
+        "name": name,
+        "ok": True,
+        "report": f"### {name}: PASS (cached)",
+        "duration_seconds": 0,
+        "cached": True,
+    }
+
+
 def _run_gate_set(
     gate_set: list, feature_dir: Path,
     _capture_returncodes: "dict | None" = None,
     max_parallel: int = 1,
+    cache_path: "Path | None" = None,
 ) -> list[dict]:
     """Run every gate in *gate_set* and return one result dict per gate.
 
@@ -7257,6 +7332,12 @@ def _run_gate_set(
     behaviour — it exists so `verify()`'s oracle path can distinguish "the
     oracle command could not even be found" (exit 127) from "the oracle ran
     and failed" without every caller having to carry that detail.
+
+    `cache_path` (FEAT-LOOP-2026-0253/T03) is the gate result cache. Only the
+    per-attempt run in `verify()` may pass it: every other run is one a
+    verdict is read from, so it runs each gate. With it, a ready gate whose
+    `gate_cache_key` matches its stored PASS is not run, and each PASS of a
+    gate with a key is stored. It is read and written on the calling thread.
     """
     results: list = [None] * len(gate_set)
     failed_names: set[str] = set()
@@ -7267,16 +7348,22 @@ def _run_gate_set(
         earlier.add(gate["name"])
     pending = list(range(len(gate_set)))
     ended: set[str] = set()
+    cache = {} if cache_path is None else _read_gate_cache(cache_path)
+    keys: dict[int, str] = {}
 
     def finish(index: int, result: dict) -> None:
         results[index] = result
+        if result["ok"] and index in keys and not result.get("cached"):
+            cache[result["name"]] = keys[index]
+            _write_gate_cache(cache_path, cache)
         ended.add(result["name"])
         if not result["ok"]:
             failed_names.add(result["name"])
 
     def take_ready() -> "int | None":
         """Remove and return the next gate to run, recording a `SKIP` for each
-        ready gate passed over because its dependency failed."""
+        ready gate passed over because its dependency failed and the stored
+        result for each one served from the cache."""
         position = 0
         while position < len(pending):
             index = pending[position]
@@ -7288,9 +7375,18 @@ def _run_gate_set(
             failed_dep = next(
                 (dep for dep in gate.get("needs") or [] if dep in failed_names),
                 None)
-            if failed_dep is None:
-                return index
-            finish(index, _skipped_gate_result(gate["name"], failed_dep))
+            if failed_dep is not None:
+                finish(index, _skipped_gate_result(gate["name"], failed_dep))
+                continue
+            key = None if cache_path is None else gate_cache_key(gate)
+            if key is not None:
+                keys[index] = key
+                if cache.get(gate["name"]) == key:
+                    finish(index, _cached_gate_result(gate["name"]))
+                    # It may have readied a gate earlier in the list.
+                    position = 0
+                    continue
+            return index
         return None
 
     if max_parallel <= 1:
@@ -8048,6 +8144,10 @@ def verify(wu: WorkUnit, feature_dir: Path,
     of its full one when the WU's `produces:` selects at least one test path.
     The `feature_oracle` append below is untiered — it runs on every attempt
     regardless, by FEAT-2026-0101's contract.
+
+    This is the only run that may reuse a gate's earlier PASS
+    (FEAT-LOOP-2026-0253/T03, see `gate_cache_key`) -- never for the
+    `feature_oracle`, nor for a gate another gate `needs`.
     """
     if cfg is None:
         cfg = load_verification()
@@ -8104,6 +8204,10 @@ def verify(wu: WorkUnit, feature_dir: Path,
     # TestNoBashFoundFailsLoud), an observable side effect this feature owes
     # no one.
     narrow_gate_set = resolve_gate_tiers(gate_set, "narrow")
+    # A dependent may use what its dependency built, which a cached result did
+    # not build. Read from the unfiltered set, so a broad-tier dependent counts.
+    never_cached = {"feature_oracle"}.union(
+        *(gate.get("needs") or [] for gate in gate_set))
     changed_lines_by_path = (
         attempt_changed_source_lines()
         if any(g.get("narrow_command") for g in narrow_gate_set) else {}
@@ -8136,9 +8240,19 @@ def verify(wu: WorkUnit, feature_dir: Path,
             ]
     oracle_declared = gate_file is not None and oracle_command
     returncodes: "dict | None" = {} if oracle_declared else None
+    # Dropping `inputs` leaves a gate with no cache key.
+    gate_set = [
+        {k: v for k, v in gate.items() if k != "inputs"}
+        if gate["name"] in never_cached else gate
+        for gate in gate_set
+    ]
+    cache_kwargs = (
+        {"cache_path": Path(feature_dir) / "work" / "gate-cache.json"}
+        if any("inputs" in gate for gate in gate_set) else {}
+    )
     gate_results = _run_gate_set(
         gate_set, feature_dir, _capture_returncodes=returncodes,
-        **_max_parallel_kwargs(cfg))
+        **cache_kwargs, **_max_parallel_kwargs(cfg))
     if oracle_declared:
         # An oracle the shell could not even run (exit 127 — "command not
         # found") is a verification.yml misconfiguration, not a defect in the
@@ -8770,14 +8884,17 @@ def build_attempt_gate_events(wu: "WorkUnit", attempt: int) -> list[dict]:
     verify was stubbed or never reached."""
     events = []
     for gr in (getattr(wu, "last_gate_results", None) or []):
-        events.append(build_event("gate_result", wu.wu_id, {
+        payload = {
             "attempt": attempt,
             "gate": gr["name"],
             "ok": bool(gr["ok"]),
             "skipped": bool(gr.get("skipped", False)),
             "duration_seconds": gr.get("duration_seconds", 0),
             "phase": "attempt",
-        }))
+        }
+        if gr.get("cached"):
+            payload["cached"] = True
+        events.append(build_event("gate_result", wu.wu_id, payload))
     return events
 
 

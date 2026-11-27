@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0253/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/loop.py
@@ -12,6 +12,13 @@ produces_driver_helper:
   - gate_cache_key
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T04:45:59.033809+00:00
+duration_seconds: 171.545
+cost_usd: 0.535849
+input_tokens: 20
+output_tokens: 15510
 ---
 
 # T03 — reuse a passing gate whose declared inputs are unchanged

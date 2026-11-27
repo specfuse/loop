@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 import tempfile
 import time
@@ -364,22 +365,182 @@ class TestParallelSafety(_StubGates):
         return status["phase"], status["gate"], status["gates_running"]
 
 
-@unittest.skip("FEAT-LOOP-2026-0253/T03")
-class TestCacheHit(unittest.TestCase):
-    def test_pending(self):
-        self.fail("not implemented")
+class _CachedGates(unittest.TestCase):
+    """A scratch repository as the working directory. Each run of a gate's
+    command appends its name to a counter file outside it."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        self.counter = root / "counter.log"
+        self.stub = root / "count.py"
+        self.stub.write_text(
+            "import sys\n"
+            "open(sys.argv[2], 'a').write(sys.argv[1] + '\\n')\n"
+            "sys.exit(int(sys.argv[3]))\n")
+        repo = root / "repo"
+        self.feature_dir = repo / "feature"
+        self.feature_dir.mkdir(parents=True)
+        (repo / "src").mkdir()
+        (repo / ".gitignore").write_text("work/\n*.ignored\n")
+        self.source = repo / "src" / "a.txt"
+        self.source.write_text("one\n")
+        subprocess.run(
+            ["git", "init", "-q", str(repo)], check=True, capture_output=True)
+        previous = os.getcwd()
+        os.chdir(repo)
+        self.addCleanup(os.chdir, previous)
+
+    def command(self, name, code=0):
+        return shlex.join([
+            Path(sys.executable).as_posix(), self.stub.as_posix(), name,
+            self.counter.as_posix(), str(code)])
+
+    def gate(self, name="unit", code=0, inputs=("src/*",), **extra):
+        gate = {"name": name, "command": self.command(name, code), **extra}
+        if inputs:
+            gate["inputs"] = list(inputs)
+        return gate
+
+    def count(self, name="unit"):
+        if not self.counter.exists():
+            return 0
+        return self.counter.read_text().split().count(name)
+
+    def verify(self, *gates, gate_file=None):
+        wu = loop.WorkUnit(
+            wu_id="FEAT-2026-9001/T01", type="implementation", model="m",
+            status="pending", attempts=0, title="t", body="", depends_on=[],
+            file=self.feature_dir / "WU.md")
+        ok, report = loop.verify(
+            wu, self.feature_dir, cfg={"code": list(gates)},
+            gate_file=gate_file)
+        return wu, ok, report
 
 
-@unittest.skip("FEAT-LOOP-2026-0253/T03")
-class TestCacheMiss(unittest.TestCase):
-    def test_pending(self):
-        self.fail("not implemented")
+class TestCacheHit(_CachedGates):
+    def test_an_unchanged_tree_reuses_the_pass(self):
+        self.verify(self.gate())
+        wu, ok, report = self.verify(self.gate())
+        self.assertEqual(self.count(), 1)
+        self.assertTrue(ok, report)
+        self.assertIn("### unit: PASS (cached)", report)
+        [event] = loop.build_attempt_gate_events(wu, 2)
+        payload = event["payload"]
+        self.assertIs(payload["cached"], True)
+        self.assertEqual(payload["duration_seconds"], 0)
+        self.assertIs(payload["ok"], True)
+
+    def test_an_ignored_file_does_not_change_the_key(self):
+        self.verify(self.gate())
+        Path("src/scratch.ignored").write_text("x")
+        self.verify(self.gate())
+        self.assertEqual(self.count(), 1)
+
+    def test_a_gate_run_fresh_carries_no_cached_field(self):
+        wu, _, _ = self.verify(self.gate())
+        [event] = loop.build_attempt_gate_events(wu, 1)
+        self.assertNotIn("cached", event["payload"])
+
+    def test_a_hit_readies_its_dependents_under_parallel_gates(self):
+        gates = [self.gate("dependent", inputs=None, needs=["unit"]),
+                 self.gate()]
+        cache_path = self.feature_dir / "work" / "gate-cache.json"
+        for _ in range(2):
+            results = loop._run_gate_set(
+                gates, self.feature_dir, max_parallel=2,
+                cache_path=cache_path)
+        self.assertEqual([r["ok"] for r in results], [True, True], results)
+        self.assertEqual((self.count(), self.count("dependent")), (1, 2))
 
 
-@unittest.skip("FEAT-LOOP-2026-0253/T03")
-class TestNeverForAVerdict(unittest.TestCase):
-    def test_pending(self):
-        self.fail("not implemented")
+class TestCacheMiss(_CachedGates):
+    def assert_reruns_after(self, change, gate=None):
+        self.verify(self.gate())
+        change()
+        self.verify(gate or self.gate())
+        self.assertEqual(self.count(), 2)
+
+    def test_editing_a_matching_file(self):
+        self.assert_reruns_after(lambda: self.source.write_text("two\n"))
+
+    def test_adding_a_matching_file(self):
+        self.assert_reruns_after(lambda: Path("src/b.txt").write_text("new"))
+
+    def test_deleting_a_matching_file(self):
+        Path("src/b.txt").write_text("kept")
+        self.assert_reruns_after(self.source.unlink)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX file modes")
+    def test_chmod_on_a_matching_file(self):
+        self.assert_reruns_after(lambda: self.source.chmod(0o755))
+
+    def test_changing_the_command(self):
+        changed = self.gate()
+        changed["command"] += " extra"
+        self.assert_reruns_after(lambda: None, changed)
+
+    def test_a_failure_is_not_stored(self):
+        for _ in range(2):
+            _, ok, _ = self.verify(self.gate(code=1))
+            self.assertFalse(ok)
+        self.assertEqual(self.count(), 2)
+
+    def test_a_gate_without_inputs(self):
+        for _ in range(2):
+            self.verify(self.gate(inputs=None))
+        self.assertEqual(self.count(), 2)
+        self.assertIsNone(loop.gate_cache_key(self.gate(inputs=None)))
+
+
+class TestNeverForAVerdict(_CachedGates):
+    def store_pass(self, gate):
+        """Store a PASS of *gate*, shown to be served to `verify()`."""
+        self.verify(gate)
+        _, _, report = self.verify(gate)
+        self.assertIn("PASS (cached)", report)
+        self.assertEqual(self.count(gate["name"]), 1)
+
+    def test_the_broad_run(self):
+        self.store_pass(self.gate())
+        ok, failing = loop.run_gate_broad_set(
+            self.feature_dir, cfg={"code": [self.gate()]})
+        self.assertTrue(ok, failing)
+        self.assertEqual(self.count(), 2)
+
+    def test_the_baseline_probe(self):
+        self.store_pass(self.gate())
+        self.assertEqual(loop.probe_baseline(
+            self.feature_dir, cfg={"code": [self.gate()]}), [])
+        self.assertEqual(self.count(), 2)
+
+    def test_the_feature_oracle(self):
+        command = self.command("feature_oracle")
+        gate_file = self.feature_dir / "GATE-01.md"
+        gate_file.write_text(
+            f"---\nfeature_oracle: {json.dumps(command)}\n---\n")
+        # Store a PASS under the oracle's name and command.
+        cache_path = self.feature_dir / "work" / "gate-cache.json"
+        seeded = {"name": "feature_oracle", "command": command,
+                  "inputs": ["src/*"]}
+        loop._run_gate_set([seeded], self.feature_dir, cache_path=cache_path)
+        _, ok, report = self.verify(
+            self.gate("other", inputs=None), gate_file=gate_file)
+        self.assertTrue(ok, report)
+        self.assertEqual(self.count("feature_oracle"), 2)
+
+    def test_a_gate_another_gate_needs(self):
+        self.store_pass(self.gate())
+        for tier in ("narrow", "broad"):
+            with self.subTest(dependent_tier=tier):
+                before = self.count()
+                _, _, report = self.verify(
+                    self.gate(),
+                    self.gate("dependent", inputs=None, needs=["unit"],
+                              tier=tier))
+                self.assertEqual(self.count(), before + 1)
+                self.assertNotIn("PASS (cached)", report)
 
 
 @unittest.skip("FEAT-LOOP-2026-0253/T04")
