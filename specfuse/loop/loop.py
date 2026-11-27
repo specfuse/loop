@@ -12447,6 +12447,8 @@ def run(
     _override_ns = argparse.Namespace(force_full_close=force_full_close)
     _override_active, _override_reason = resolve_auto_close_override(_override_ns, feature_dir)
     events_path = feature_dir / "events.jsonl"
+    _progress.remember_run(
+        feature_id, feature_dir, events_path, load_graph=load_graph)
     work_dir = feature_dir / "work"
     backend = make_backend(feat_fm)
     backend.on_feature_start(feature_id, feat_fm)
@@ -12503,6 +12505,7 @@ def run(
         try:
             lock_fd = acquire_tree_lock(SPECFUSE_DIR)
         except BlockingIOError:
+            _progress.disown_status()
             print(
                 "another loop driver is already running in this working tree "
                 "(.specfuse/.loop.lock held)",
@@ -15095,9 +15098,18 @@ def main() -> int:
         # the run cannot continue, so the run does not continue.
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
-               prepare=args.prepare, prepare_only=args.prepare_only,
-               no_baseline_probe=args.no_baseline_probe)
+    _progress.forget_run()
+    raised = True
+    try:
+        rc = run(args.feature, args.dry_run,
+                 force_full_close=args.force_full_close,
+                 prepare=args.prepare, prepare_only=args.prepare_only,
+                 no_baseline_probe=args.no_baseline_probe)
+        raised = False
+        return rc
+    finally:
+        if not args.dry_run:
+            _progress.notify_stop(raised=raised, feature_arg=args.feature)
 
 
 if __name__ == "__main__":

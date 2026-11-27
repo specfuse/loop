@@ -4,7 +4,7 @@
 #
 """FEAT-LOOP-2026-0252 gate 1 oracle — a running unit's progress is visible.
 One class per Definition-of-done clause in GATE-01.md. T01 implements clauses
-1, 2 and 4, T02 clause 3; the rest are skipped naming their owning unit.
+1, 2 and 4, T02 clause 3, T03 clause 5, T04 clause 6.
 
 Every run goes through `loop.run()` in a temporary repository, with a stubbed
 agent session and two real stub gate commands. What must be on disk while the
@@ -20,6 +20,7 @@ import io
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -29,7 +30,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from specfuse.loop import validate_event
+from specfuse.loop import notify, progress, validate_event
 from tests._loop_loader import load_loop
 from tests._workspace import integration_workspace, write_stub_deliverable
 
@@ -561,12 +562,225 @@ class TestWatch(unittest.TestCase):
             f".specfuse/features/{FEATURE_ID}-{SLUG}/work/STATUS.json", err)
 
 
-@unittest.skip("FEAT-LOOP-2026-0252/T04")
-class TestStopNotification(unittest.TestCase):
-    """Clause 6 — owned by T04."""
+_STUB_COMMAND = (
+    "import json, os, sys\n"
+    "seen = {k: v for k, v in os.environ.items() "
+    "if k.startswith('SPECFUSE_')}\n"
+    "open(sys.argv[1], 'a').write("
+    "json.dumps({'argv': sys.argv[1:], 'env': seen}) + '\\n')\n"
+)
+_NOTIFY_VARS = (
+    "SPECFUSE_STOP_REASON", "SPECFUSE_FEATURE", "SPECFUSE_WORK_UNIT",
+    "SPECFUSE_MESSAGE",
+)
 
-    def test_placeholder(self):
-        self.fail("T04 replaces this class")
+
+def _passing_session(wu, failure_note, cost_tracking=True):
+    write_stub_deliverable(wu)
+    return "```result\nstatus: complete\n```\n"
+
+
+def _blocked_session(wu, failure_note, cost_tracking=True):
+    return ("```result\nstatus: blocked\n"
+            "blocked_reason: needs a human\n```\n")
+
+
+def _raising_session(wu, failure_note, cost_tracking=True):
+    raise _SessionBoom()
+
+
+class _Notified:
+    """One `loop.main()` over the real `run()`, with a counting webhook poster
+    and a stub notify command that records each call outside the tree."""
+
+    def __init__(self, session=_passing_session, *, command="stub",
+                 webhook=True, argv=(), prepare=None):
+        self.posts = []
+        self.rc = self.raised = self.status = None
+        with integration_workspace() as root, \
+                tempfile.TemporaryDirectory() as outside:
+            cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                self._run(root, Path(outside), session, command, webhook,
+                          argv, prepare)
+            finally:
+                os.chdir(cwd)
+
+    def _run(self, root, outside, session, command, webhook, argv, prepare):
+        fdir = _scaffold(root, outside)
+        stub = outside / "stub.py"
+        stub.write_text(_STUB_COMMAND)
+        calls = outside / "calls.jsonl"
+        if command == "stub":
+            command = shlex.join([sys.executable, str(stub), str(calls)])
+        lines = ["escalation:",
+                 f"  webhook_env: {'FIXTURE_HOOK' if webhook else chr(34) * 2}",
+                 f"  provider: {'slack' if webhook else 'none'}"]
+        if command is not None:
+            lines.append(f"  notify_command: {json.dumps(command)}")
+        (root / ".specfuse/agent-policy.yml").write_text(
+            "\n".join(lines) + "\n")
+        if prepare is not None:
+            prepare(fdir)
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "policy"], check=True)
+
+        def poster(url, payload):
+            self.posts.append((url, payload))
+            return 200
+
+        out = io.StringIO()
+        with mock.patch.object(sys, "argv", ["specfuse-loop", *argv]), \
+                mock.patch.dict(os.environ,
+                                {"FIXTURE_HOOK": "https://example.com/hook"}), \
+                mock.patch.object(notify, "_default_poster", poster), \
+                mock.patch.object(loop, "_reexec_pinned", lambda _a: None), \
+                mock.patch.object(loop, "auto_sync"), \
+                mock.patch.object(loop, "dispatch", session), \
+                contextlib.redirect_stdout(out), \
+                contextlib.redirect_stderr(out):
+            try:
+                self.rc = loop.main()
+            except (_SessionBoom, SystemExit) as exc:
+                self.raised = exc
+        self.output = out.getvalue()
+        self.commands = [json.loads(ln) for ln in
+                         calls.read_text().splitlines()] \
+            if calls.exists() else []
+        status = fdir / "work" / "STATUS.json"
+        if status.is_file():
+            self.status = json.loads(status.read_text())
+        self.pwned = list(root.rglob("pwned"))
+
+
+def _all_passed(fdir):
+    for name, old, new in (("GATE-01.md", "open", "passed"),
+                           ("PLAN.md", "active", "done")):
+        path = fdir / name
+        path.write_text(path.read_text().replace(
+            f"status: {old}", f"status: {new}"))
+
+
+def _draft_unit(fdir):
+    path = fdir / "WU-T01.md"
+    path.write_text(path.read_text().replace(
+        "status: pending", "status: draft"))
+
+
+class TestStopNotification(unittest.TestCase):
+    """Clause 6 — one notification when the run stops."""
+
+    def _assert_notified(self, seen, reason, unit):
+        self.assertEqual(len(seen.posts), 1, seen.output)
+        self.assertEqual(len(seen.commands), 1, seen.output)
+        env = seen.commands[0]["env"]
+        for name in _NOTIFY_VARS:
+            self.assertIn(name, env)
+        self.assertEqual(env["SPECFUSE_STOP_REASON"], reason, seen.output)
+        self.assertEqual(env["SPECFUSE_FEATURE"], FEATURE_ID)
+        self.assertEqual(env["SPECFUSE_WORK_UNIT"], unit, seen.output)
+        self.assertIn(reason, env["SPECFUSE_MESSAGE"])
+        self.assertEqual(seen.posts[0][1], {"text": env["SPECFUSE_MESSAGE"]})
+        self.assertEqual(len(seen.commands[0]["argv"]), 1)
+        self.assertEqual(seen.status["phase"], "stopped")
+        self.assertEqual(seen.status["stop_reason"], reason)
+
+    def test_halted(self):
+        seen = _Notified(_blocked_session)
+        self._assert_notified(seen, "halted", WU_ID)
+
+    def test_awaiting_review(self):
+        seen = _Notified()
+        self.assertEqual(seen.rc, 0, seen.output)
+        self._assert_notified(seen, "awaiting_review", WU_ID)
+
+    def test_complete(self):
+        seen = _Notified(prepare=_all_passed,
+                         argv=("--feature", FEATURE_ID))
+        self.assertEqual(seen.rc, 0, seen.output)
+        self._assert_notified(seen, "complete", "")
+
+    def test_error(self):
+        seen = _Notified(_raising_session)
+        self.assertIsInstance(seen.raised, _SessionBoom, seen.output)
+        self._assert_notified(seen, "error", WU_ID)
+
+    def test_stopped(self):
+        seen = _Notified(prepare=_draft_unit)
+        self.assertEqual(seen.rc, 2, seen.output)
+        self._assert_notified(seen, "stopped", "")
+
+    def test_events_of_an_earlier_run_are_not_read(self):
+        def earlier(fdir):
+            _draft_unit(fdir)
+            (fdir / "events.jsonl").write_text(json.dumps({
+                "event_type": "human_escalation",
+                "correlation_id": WU_ID, "payload": {}}) + "\n")
+
+        self._assert_notified(_Notified(prepare=earlier), "stopped", "")
+
+    def test_a_held_lock_leaves_the_other_drivers_status_alone(self):
+        live = _status()
+
+        def other_driver(fdir):
+            (fdir / "work").mkdir()
+            (fdir / "work" / ".gitignore").write_text("*\n")
+            (fdir / "work" / "STATUS.json").write_text(json.dumps(live))
+
+        with mock.patch.object(loop, "acquire_tree_lock",
+                               side_effect=BlockingIOError):
+            seen = _Notified(prepare=other_driver)
+        self.assertEqual(seen.rc, 1, seen.output)
+        self.assertEqual(len(seen.commands), 1, seen.output)
+        self.assertEqual(seen.status, live)
+
+    def test_a_failing_command_leaves_the_exit_code_unchanged(self):
+        python = shlex.quote(sys.executable)
+        for label, command in (
+            ("exit 1", f"{python} -c 'raise SystemExit(1)'"),
+            ("timeout", f"{python} -c 'import time; time.sleep(20)'"),
+            ("missing", "specfuse-no-such-program-fixture"),
+            ("unbalanced quote", "echo 'x"),
+        ):
+            with self.subTest(label), \
+                    mock.patch.object(progress, "_NOTIFY_TIMEOUT_SECONDS", 1), \
+                    self.assertLogs(progress.logger, "WARNING"):
+                started = time.monotonic()
+                seen = _Notified(command=command)
+                self.assertEqual(seen.rc, 0, seen.output)
+                self.assertIsNone(seen.raised)
+                self.assertEqual(len(seen.posts), 1)
+                self.assertLess(time.monotonic() - started, 15)
+
+    def test_the_command_timeout_is_thirty_seconds(self):
+        self.assertEqual(progress._NOTIFY_TIMEOUT_SECONDS, 30)
+
+    def test_nothing_configured_sends_nothing(self):
+        with mock.patch.object(progress.subprocess, "run",
+                               wraps=subprocess.run) as ran:
+            seen = _Notified(command=None, webhook=False)
+        self.assertEqual(seen.rc, 0, seen.output)
+        self.assertEqual((seen.posts, seen.commands), ([], []))
+        self.assertEqual(
+            [c for c in ran.call_args_list
+             if "SPECFUSE_MESSAGE" in (c.kwargs.get("env") or {})], [])
+
+    def test_dry_run_sends_nothing(self):
+        seen = _Notified(argv=("--dry-run",))
+        self.assertEqual(seen.rc, 0, seen.output)
+        self.assertEqual((seen.posts, seen.commands), ([], []))
+
+    def test_message_never_reaches_a_shell(self):
+        hostile = "FEAT-X; touch pwned"
+        seen = _Notified(argv=("--feature", hostile))
+        self.assertIsInstance(seen.raised, SystemExit, seen.output)
+        self.assertEqual(len(seen.commands), 1, seen.output)
+        env = seen.commands[0]["env"]
+        self.assertIn("; touch pwned", env["SPECFUSE_MESSAGE"])
+        self.assertEqual(env["SPECFUSE_STOP_REASON"], "error")
+        self.assertEqual(len(seen.commands[0]["argv"]), 1)
+        self.assertEqual(seen.pwned, [])
 
 
 if __name__ == "__main__":

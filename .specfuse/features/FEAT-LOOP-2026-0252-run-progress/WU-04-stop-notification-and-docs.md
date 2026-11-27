@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0252/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/progress.py
@@ -16,6 +16,13 @@ produces_driver_helper:
   - main
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T03:18:08.982098+00:00
+duration_seconds: 327.456
+cost_usd: 0.719836
+input_tokens: 26
+output_tokens: 19711
 ---
 
 # T04 — one notification when the run stops, and the docs

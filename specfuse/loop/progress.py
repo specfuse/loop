@@ -19,6 +19,9 @@ module, so this module does not import it.
 `watch` is the `specfuse-loop --watch` reader, run from a second terminal. It
 only reads the status file: it takes no run lock and writes nothing.
 
+`notify_stop` runs once, after `run()` has ended: it works out why the run
+stopped from the events that run appended, and tells the operator.
+
 Reports only; no merge, arm or close verdict reads anything written here.
 """
 
@@ -26,14 +29,21 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import os
+import shlex
 import shutil
+import subprocess
 import sys
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+
+from . import agent_policy, notify
+
+logger = logging.getLogger(__name__)
 
 STATUS_FILENAME = "STATUS.json"
 
@@ -263,6 +273,183 @@ def gate_finished(name: str, ok: bool, duration_seconds: float) -> None:
         "attempt": _run.attempt, "gate": name, "ok": bool(ok),
         "duration_seconds": duration_seconds})
     _say(f"gate {name} {'PASS' if ok else 'FAIL'} ({duration_seconds:.1f}s)")
+
+
+_NOTIFY_TIMEOUT_SECONDS = 30
+
+
+@dataclass
+class _Stop:
+    """What `notify_stop` needs once `run()` has ended."""
+
+    feature: str
+    feature_dir: Path
+    events_path: Path
+    events_offset: int
+    load_graph: Callable
+    owns_status: bool = True
+
+
+_stop: "_Stop | None" = None
+
+
+def remember_run(
+    feature: str, feature_dir: Path, events_path: Path, *,
+    load_graph: Callable,
+) -> None:
+    """Call as the run starts, before it appends any event."""
+    global _stop
+    try:
+        offset = Path(events_path).stat().st_size
+    except OSError:
+        offset = 0
+    _stop = _Stop(feature, Path(feature_dir), Path(events_path), offset,
+                  load_graph)
+
+
+def disown_status() -> None:
+    """Another driver holds the tree: its status file is not ours to write."""
+    if _stop is not None:
+        _stop.owns_status = False
+
+
+def forget_run() -> None:
+    global _stop
+    _stop = None
+
+
+def _events_since(path: Path, offset: int) -> "list[dict]":
+    try:
+        with path.open("rb") as fh:
+            fh.seek(offset)
+            lines = fh.read().decode("utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    events = []
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+    return events
+
+
+def _stop_reason(
+    stop: "_Stop | None", events: "list[dict]", raised: bool,
+) -> str:
+    fallback = "error" if raised else "stopped"
+    if stop is None:
+        return fallback
+    if any(e.get("event_type") == "human_escalation" for e in events):
+        return "halted"
+    try:
+        plan, gates = stop.load_graph(stop.feature_dir)
+    except (Exception, SystemExit):  # noqa: BLE001 — an unreadable plan
+        return fallback
+    reached = {(e.get("payload") or {}).get("gate") for e in events
+               if e.get("event_type") == "gate_reached"}
+    if any(g.number in reached and g.status == "awaiting_review"
+           for g in gates):
+        return "awaiting_review"
+    if plan.get("status") == "done":
+        return "complete"
+    return fallback
+
+
+def _stop_work_unit(events: "list[dict]") -> str:
+    """The unit of the last escalation, else the last unit the run wrote
+    about. A feature-level escalation may name the unit it halted before."""
+    escalations = [e for e in events
+                   if e.get("event_type") == "human_escalation"]
+    if escalations:
+        last = escalations[-1]
+        unit = str(last.get("correlation_id", ""))
+        if "/" in unit:
+            return unit
+        return str((last.get("payload") or {}).get("next_wu_id") or "")
+    for event in reversed(events):
+        unit = str(event.get("correlation_id", ""))
+        if "/" in unit:
+            return unit
+    return ""
+
+
+def _run_notify_command(env: "dict[str, str]") -> None:
+    """Run `escalation.notify_command`, when set, as an argument list."""
+    try:
+        policy = agent_policy.load_policy(None)
+    except FileNotFoundError:
+        return
+    escalation = policy.get("escalation") if isinstance(policy, dict) else None
+    command = (escalation.get("notify_command")
+               if isinstance(escalation, dict) else None)
+    if not isinstance(command, str) or not command.strip():
+        return
+    try:
+        done = subprocess.run(
+            shlex.split(command), env={**os.environ, **env},
+            timeout=_NOTIFY_TIMEOUT_SECONDS, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            check=False)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        # The exception's text repeats the command, which may hold a token.
+        logger.warning("notify_command failed: %s", type(exc).__name__)
+        return
+    if done.returncode != 0:
+        logger.warning("notify_command exited %s", done.returncode)
+
+
+def notify_stop(*, raised: bool, feature_arg: "str | None" = None) -> None:
+    """Record why the run stopped and send it once to each configured channel.
+
+    Never raises: reporting does not change how a run ends. A run that failed
+    before it found its feature is reported under *feature_arg*.
+    """
+    global _stop
+    stop, _stop = _stop, None
+    try:
+        events = ([] if stop is None
+                  else _events_since(stop.events_path, stop.events_offset))
+        reason = _stop_reason(stop, events, raised)
+        feature = stop.feature if stop else (feature_arg or "")
+        unit = _stop_work_unit(events)
+        if stop is not None and stop.owns_status:
+            _write_stop_reason(stop, reason)
+        message = f"specfuse-loop {reason}: {feature or 'unknown feature'}"
+        if unit:
+            message += f" (last unit {unit})"
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("stop notification not built: %s", type(exc).__name__)
+        return
+    try:
+        notify.post_notification(message)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("stop webhook failed: %s", type(exc).__name__)
+    try:
+        _run_notify_command({
+            "SPECFUSE_STOP_REASON": reason,
+            "SPECFUSE_FEATURE": feature,
+            "SPECFUSE_WORK_UNIT": unit,
+            "SPECFUSE_MESSAGE": message,
+        })
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("notify_command failed: %s", type(exc).__name__)
+
+
+def _write_stop_reason(stop: _Stop, reason: str) -> None:
+    """Set `stop_reason` on the status file. A run that ended before
+    `begin_run` replaces whatever an earlier run left there."""
+    now = _now()
+    status = _read_status(status_path(stop.feature_dir)) or {
+        "feature": stop.feature, "wu_id": None, "attempt": None,
+        "max_attempts": None, "started_at": now, "elapsed_seconds": 0.0,
+        "files_touched": [],
+    }
+    status.update(phase=PHASE_STOPPED, gate=None, updated_at=now,
+                  stop_reason=reason)
+    write_status(stop.feature_dir, status)
 
 
 # A watcher is stale after this many heartbeat intervals without a rewrite.
