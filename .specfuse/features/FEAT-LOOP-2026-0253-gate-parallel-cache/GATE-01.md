@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_gate_parallel_cache -v -b"
 cost_budget_usd: 19.00
 broad_run:
