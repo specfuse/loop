@@ -1,12 +1,28 @@
 ---
 id: FEAT-LOOP-2026-0253/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 model: sonnet
 effort: high
+judge_edit_acknowledged:
+  paths:
+    - .specfuse/verification.yml.example
+    - produces_driver_helper
+    - specfuse/loop/data/verification.yml.example
+    - specfuse/loop/loop.py
+  reason: "Driver changes reviewed"
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-11-27T12:11:21+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 0.0
+    prior_duration_seconds: 0.0
+    reason: "Driver changes reviewed"
 ---
 
 # G1-CLOSE — terminal close

@@ -35,10 +35,14 @@ commands that record when they start and end:
    `events.jsonl` holds only whole lines. While gates run in parallel, `STATUS.json` has `phase:
    gate`, `gate` set to one running gate's name, and `gates_running` listing every running
    gate.
-5. **Cache hit.** A gate declaring `inputs:` that passed in an earlier attempt of the same
-   unit, whose command and matching files (path, mode, content) are unchanged, is not run in
-   the per-attempt `verify()`: its report reads `PASS (cached)` and its `gate_result` event has
-   `cached: true` and `duration_seconds: 0`.
+5. **Cache hit.** A gate declaring `inputs:` that passed in an earlier attempt in this feature
+   (of the same unit or an earlier one), whose command and matching files (path, mode,
+   content) are unchanged, is not run in the per-attempt `verify()`: its report reads
+   `PASS (cached)` and its `gate_result` event has `cached: true` and `duration_seconds: 0`.
+   *(Widened 2026-11-27 before the close, from "an earlier attempt of the same unit", on the
+   operator's standing instruction to take the drafter's recommendations: the cache is kept
+   per feature, and an identical command and identical inputs give the same result whichever
+   unit ran them.)*
 6. **Cache miss.** Changing, adding or deleting a file matching `inputs:`, changing a matched
    file's mode, or changing the gate's command runs it fresh. A gate that failed is never
    stored. A gate with no `inputs:` is never served from cache.
