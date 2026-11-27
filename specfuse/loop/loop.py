@@ -40,6 +40,7 @@ Swap those; everything else is portable.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime as dt
 import fnmatch
 import functools
@@ -661,6 +662,26 @@ def resolve_fail_fast_deliverables(verification_cfg: dict) -> bool:
     """
     project = (verification_cfg or {}).get("defaults") or {}
     return bool(project.get("fail_fast_deliverables", True))
+
+
+def resolve_max_parallel(verification_cfg: dict) -> int:
+    """How many gates of one set may run at once (FEAT-LOOP-2026-0253/T01).
+
+    Reads `defaults.max_parallel` from verification.yml. Defaults to 1, which
+    runs the set one gate at a time. Anything that is not an integer >= 1
+    means 1.
+    """
+    value = ((verification_cfg or {}).get("defaults") or {}).get("max_parallel", 1)
+    if type(value) is not int or value < 1:
+        return 1
+    return value
+
+
+def _max_parallel_kwargs(verification_cfg: dict) -> dict:
+    """The `_run_gate_set` keyword for *verification_cfg*: empty at 1, so a
+    caller that did not opt in makes the same call as before."""
+    limit = resolve_max_parallel(verification_cfg)
+    return {"max_parallel": limit} if limit > 1 else {}
 
 
 def resolve_heartbeat_seconds(verification_cfg: dict) -> int:
@@ -7090,9 +7111,120 @@ def build_phase_gate_events(phase: str, correlation_id: str) -> list[dict]:
     return events
 
 
+def _run_gate(
+    gate: dict, feature_dir: Path,
+    _capture_returncodes: "dict | None" = None,
+) -> dict:
+    """Run one gate in its own subprocess and return its result dict (see
+    `_run_gate_set`). Safe to call from a worker thread."""
+    command = gate["command"].replace("{feature_dir}", str(feature_dir))
+    command = normalize_interpreter(command)
+    # shell=True is intentional: gate commands are authored by the user in
+    # verification.yml and routinely use shell features (pipes, &&, glob,
+    # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
+    # is the project's own config, not untrusted external data.
+    #
+    # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
+    # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
+    # output pipe so communicate() stalls past the timeout):
+    #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
+    #     gets EOF immediately and fails fast instead of blocking forever.
+    #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
+    #     taskkill (Windows) on timeout — the gate runs in its own process
+    #     group; on timeout the WHOLE group (shell + grandchildren) is
+    #     killed, so the timer actually returns.
+    is_win32 = sys.platform == "win32"
+    spawn_kwargs = (
+        {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
+        if is_win32
+        else {"start_new_session": True}
+    )
+    if is_win32:
+        # cmd.exe (the shell=True default on Windows) does not understand
+        # the POSIX shell syntax (&&, ||, globs, pipes) that real
+        # verification.yml gate commands routinely use. Route through
+        # Git-Bash instead so gate commands run unmodified across
+        # platforms.
+        bash = resolve_bash()
+        if not bash:
+            return {
+                "name": gate["name"],
+                "ok": False,
+                "report": (
+                    f"### {gate['name']}: FAIL\n```\n$ {command}\n"
+                    f"No Git-Bash found — install Git for Windows "
+                    f"(https://git-scm.com/download/win) so gate commands can "
+                    f"run through bash.exe.\n```"
+                ),
+                "duration_seconds": 0,
+            }
+        popen_argv = [bash, "-c", command]
+        popen_kwargs = dict(shell=False)
+    else:
+        popen_argv = command
+        popen_kwargs = dict(shell=True)  # nosec B604
+    _progress.gate_started(gate["name"])
+    gate_started = time.monotonic()
+    proc = subprocess.Popen(  # nosec B602
+        popen_argv, stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        # Gate commands run the project's own suite; the driver's pin
+        # marker must not leak into them. See
+        # `child_env_without_pin_marker` for the failure this prevents.
+        env=child_env_without_pin_marker(),
+        **popen_kwargs, **spawn_kwargs,
+    )
+    try:
+        out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
+        ok = proc.returncode == 0
+        if _capture_returncodes is not None:
+            _capture_returncodes[gate["name"]] = proc.returncode
+        tail = select_gate_report_lines(
+            out, window=15, returncode=proc.returncode)
+        # A green gate whose oracle silently degraded is a hollow pass
+        # (issue #134): force FAIL and name the degradation honestly so the
+        # log reads as "oracle couldn't measure it," not "code is clean."
+        if ok:
+            degraded = detect_degraded_oracle(out or "")
+            if degraded:
+                ok = False
+                tail = tail + [f"DEGRADED ORACLE: {degraded}"]
+    except subprocess.TimeoutExpired:
+        if is_win32:
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                capture_output=True, check=False,
+            )
+        else:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
+        out, _ = proc.communicate()
+        ok = False
+        tail = select_gate_report_lines(out, window=10) + [
+            f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
+            f"(process group) — a hang (test reading stdin, infinite loop, "
+            f"or a wedged subprocess)."
+        ]
+    gate_duration = round(time.monotonic() - gate_started, 3)
+    _progress.gate_finished(gate["name"], ok, gate_duration)
+    log_path = persist_gate_output(feature_dir, gate["name"], out)
+    if log_path is not None:
+        tail = tail + [f"full output: {log_path}"]
+    return {
+        "name": gate["name"],
+        "ok": ok,
+        "report": (f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
+                   f"```\n$ {command}\n" + "\n".join(tail) + "\n```"),
+        "duration_seconds": gate_duration,
+    }
+
+
 def _run_gate_set(
     gate_set: list, feature_dir: Path,
     _capture_returncodes: "dict | None" = None,
+    max_parallel: int = 1,
 ) -> list[dict]:
     """Run every gate in *gate_set* and return one result dict per gate.
 
@@ -7110,6 +7242,13 @@ def _run_gate_set(
     run, reported as `SKIP` rather than `FAIL` so `parse_gate_failure_signature`
     still attributes the attempt to the dependency that actually failed.
 
+    At most `max_parallel` gates run at once (FEAT-LOOP-2026-0253/T01). A gate
+    is ready once every gate it `needs` has ended; among ready gates the one
+    earliest in *gate_set* starts first. At 1 each gate runs on the calling
+    thread, in *gate_set* order. Results are in *gate_set* order whatever the
+    finishing order. Only a `needs` edge to a gate earlier in *gate_set* is
+    waited on, which in an `order_gate_set` order is every edge in the set.
+
     `_capture_returncodes` (FEAT-2026-0101/T05) is an optional out-parameter:
     when given a dict, each gate that actually spawns a subprocess records its
     raw `returncode` under its gate name. It does not change the return
@@ -7118,131 +7257,76 @@ def _run_gate_set(
     oracle command could not even be found" (exit 127) from "the oracle ran
     and failed" without every caller having to carry that detail.
     """
-    results = []
+    results: list = [None] * len(gate_set)
     failed_names: set[str] = set()
+    earlier: set[str] = set()
+    waits_on: list[set[str]] = []
     for gate in gate_set:
-        needs = gate.get("needs") or []
-        failed_dep = next((dep for dep in needs if dep in failed_names), None)
-        if failed_dep is not None:
-            failed_names.add(gate["name"])
-            results.append({
-                "name": gate["name"],
-                "ok": False,
-                "report": (
-                    f"### {gate['name']}: SKIP — dependency "
-                    f"'{failed_dep}' failed"
-                ),
-                "skipped": True,
-                "duration_seconds": 0,
-            })
-            continue
-        command = gate["command"].replace("{feature_dir}", str(feature_dir))
-        command = normalize_interpreter(command)
-        # shell=True is intentional: gate commands are authored by the user in
-        # verification.yml and routinely use shell features (pipes, &&, glob,
-        # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
-        # is the project's own config, not untrusted external data.
-        #
-        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
-        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
-        # output pipe so communicate() stalls past the timeout):
-        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
-        #     gets EOF immediately and fails fast instead of blocking forever.
-        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
-        #     taskkill (Windows) on timeout — the gate runs in its own process
-        #     group; on timeout the WHOLE group (shell + grandchildren) is
-        #     killed, so the timer actually returns.
-        is_win32 = sys.platform == "win32"
-        spawn_kwargs = (
-            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
-            if is_win32
-            else {"start_new_session": True}
-        )
-        if is_win32:
-            # cmd.exe (the shell=True default on Windows) does not understand
-            # the POSIX shell syntax (&&, ||, globs, pipes) that real
-            # verification.yml gate commands routinely use. Route through
-            # Git-Bash instead so gate commands run unmodified across
-            # platforms.
-            bash = resolve_bash()
-            if not bash:
-                failed_names.add(gate["name"])
-                results.append({
-                    "name": gate["name"],
-                    "ok": False,
-                    "report": (
-                        f"### {gate['name']}: FAIL\n```\n$ {command}\n"
-                        f"No Git-Bash found — install Git for Windows "
-                        f"(https://git-scm.com/download/win) so gate commands can "
-                        f"run through bash.exe.\n```"
-                    ),
-                    "duration_seconds": 0,
-                })
+        waits_on.append(earlier.intersection(gate.get("needs") or []))
+        earlier.add(gate["name"])
+    pending = list(range(len(gate_set)))
+    ended: set[str] = set()
+
+    def finish(index: int, result: dict) -> None:
+        results[index] = result
+        ended.add(result["name"])
+        if not result["ok"]:
+            failed_names.add(result["name"])
+
+    def take_ready() -> "int | None":
+        """Remove and return the next gate to run, recording a `SKIP` for each
+        ready gate passed over because its dependency failed."""
+        position = 0
+        while position < len(pending):
+            index = pending[position]
+            if not waits_on[index] <= ended:
+                position += 1
                 continue
-            popen_argv = [bash, "-c", command]
-            popen_kwargs = dict(shell=False)
-        else:
-            popen_argv = command
-            popen_kwargs = dict(shell=True)  # nosec B604
-        _progress.gate_started(gate["name"])
-        gate_started = time.monotonic()
-        proc = subprocess.Popen(  # nosec B602
-            popen_argv, stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            # Gate commands run the project's own suite; the driver's pin
-            # marker must not leak into them. See
-            # `child_env_without_pin_marker` for the failure this prevents.
-            env=child_env_without_pin_marker(),
-            **popen_kwargs, **spawn_kwargs,
-        )
-        try:
-            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
-            ok = proc.returncode == 0
-            if _capture_returncodes is not None:
-                _capture_returncodes[gate["name"]] = proc.returncode
-            tail = select_gate_report_lines(
-                out, window=15, returncode=proc.returncode)
-            # A green gate whose oracle silently degraded is a hollow pass
-            # (issue #134): force FAIL and name the degradation honestly so the
-            # log reads as "oracle couldn't measure it," not "code is clean."
-            if ok:
-                degraded = detect_degraded_oracle(out or "")
-                if degraded:
-                    ok = False
-                    tail = tail + [f"DEGRADED ORACLE: {degraded}"]
-        except subprocess.TimeoutExpired:
-            if is_win32:
-                subprocess.run(
-                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
-                    capture_output=True, check=False,
-                )
-            else:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
-                    proc.kill()
-            out, _ = proc.communicate()
-            ok = False
-            tail = select_gate_report_lines(out, window=10) + [
-                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
-                f"(process group) — a hang (test reading stdin, infinite loop, "
-                f"or a wedged subprocess)."
-            ]
-        gate_duration = round(time.monotonic() - gate_started, 3)
-        _progress.gate_finished(gate["name"], ok, gate_duration)
-        if not ok:
-            failed_names.add(gate["name"])
-        log_path = persist_gate_output(feature_dir, gate["name"], out)
-        if log_path is not None:
-            tail = tail + [f"full output: {log_path}"]
-        results.append({
-            "name": gate["name"],
-            "ok": ok,
-            "report": (f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
-                       f"```\n$ {command}\n" + "\n".join(tail) + "\n```"),
-            "duration_seconds": gate_duration,
-        })
-    return results
+            pending.pop(position)
+            gate = gate_set[index]
+            failed_dep = next(
+                (dep for dep in gate.get("needs") or [] if dep in failed_names),
+                None)
+            if failed_dep is None:
+                return index
+            finish(index, _skipped_gate_result(gate["name"], failed_dep))
+        return None
+
+    if max_parallel <= 1:
+        while (index := take_ready()) is not None:
+            finish(index, _run_gate(
+                gate_set[index], feature_dir, _capture_returncodes))
+        return results
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel) as pool:
+        running: dict = {}
+        while True:
+            # Submit only into a free slot: a queued gate would start in an
+            # order the next completion could no longer change.
+            while len(running) < max_parallel:
+                index = take_ready()
+                if index is None:
+                    break
+                running[pool.submit(
+                    _run_gate, gate_set[index], feature_dir,
+                    _capture_returncodes)] = index
+            if not running:
+                return results
+            done, _ = concurrent.futures.wait(
+                running, return_when=concurrent.futures.FIRST_COMPLETED)
+            for future in done:
+                finish(running.pop(future), future.result())
+
+
+def _skipped_gate_result(name: str, failed_dep: str) -> dict:
+    """The result of a gate not run because *failed_dep* did not pass."""
+    return {
+        "name": name,
+        "ok": False,
+        "report": f"### {name}: SKIP — dependency '{failed_dep}' failed",
+        "skipped": True,
+        "duration_seconds": 0,
+    }
 
 
 def resolve_gate_tiers(gate_set: list, tier: str) -> list:
@@ -7308,7 +7392,8 @@ def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bo
             ),
         }]
     gate_set = resolve_gate_tiers(gate_set, "broad")
-    gate_results = _run_gate_set(gate_set, feature_dir)
+    gate_results = _run_gate_set(
+        gate_set, feature_dir, **_max_parallel_kwargs(cfg))
     _PHASE_GATE_RESULTS["broad"] = list(gate_results)
     failing = []
     for g in gate_results:
@@ -8050,7 +8135,9 @@ def verify(wu: WorkUnit, feature_dir: Path,
             ]
     oracle_declared = gate_file is not None and oracle_command
     returncodes: "dict | None" = {} if oracle_declared else None
-    gate_results = _run_gate_set(gate_set, feature_dir, _capture_returncodes=returncodes)
+    gate_results = _run_gate_set(
+        gate_set, feature_dir, _capture_returncodes=returncodes,
+        **_max_parallel_kwargs(cfg))
     if oracle_declared:
         # An oracle the shell could not even run (exit 127 — "command not
         # found") is a verification.yml misconfiguration, not a defect in the
@@ -8109,7 +8196,8 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
                 f"re-run."
             ),
         }]
-    gate_results = _run_gate_set(gate_set, feature_dir)
+    gate_results = _run_gate_set(
+        gate_set, feature_dir, **_max_parallel_kwargs(cfg))
     _PHASE_GATE_RESULTS["baseline"] = list(gate_results)
     failing = []
     for g in gate_results:

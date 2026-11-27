@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0253/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/loop.py
@@ -12,6 +12,13 @@ produces_driver_helper:
   - resolve_max_parallel
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T04:38:59.786494+00:00
+duration_seconds: 232.782
+cost_usd: 0.568478
+input_tokens: 30
+output_tokens: 15981
 ---
 
 # T01 — walking skeleton: a scheduler for `_run_gate_set()` bounded by `max_parallel`
