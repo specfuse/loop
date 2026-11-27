@@ -169,6 +169,7 @@ NON_JUDGE_MODULES = {
     "notify_sla.py": "as notify.py",
     "policy_proposals.py": "drafts policy changes for a human to accept",
     "policy_review.py": "presents proposals; the human decides",
+    "progress.py": "reports progress; changes no verdict",
     "promotion.py": "records which triaged feature issues became roadmap rows "
         "and reports the backlog awaiting a decision; a human-facing count, "
         "read by no gate, merge, arm or close verdict. Distinct from "

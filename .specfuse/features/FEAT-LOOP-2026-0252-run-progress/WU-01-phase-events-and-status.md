@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0252/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/progress.py
@@ -15,6 +15,13 @@ produces_driver_helper:
   - _run_gate_set
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T03:04:42.096854+00:00
+duration_seconds: 486.578
+cost_usd: 1.274903
+input_tokens: 46
+output_tokens: 29228
 ---
 
 # T01 — walking skeleton: phase events, the status file and plain driver lines

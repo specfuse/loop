@@ -1,0 +1,2 @@
+- **FEAT-LOOP-2026-0252/T01**: Added specfuse/loop/progress.py and wired it into loop.py, so phase events are appended as they happen, work/STATUS.json tracks the phase, and each session or gate change prints one plain line; four event types registered in the packaged schema.
+  - note: T02 should fill files_touched (always [] now) inside progress._rewrite_status, and its thread will share the module-global _run with the main thread, so status writes need a lock (the temp file name is per process, not per thread).

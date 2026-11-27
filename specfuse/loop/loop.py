@@ -66,6 +66,7 @@ from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
 from . import criteria_state
+from . import progress as _progress
 from . import ids as _ids
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES
@@ -5240,6 +5241,14 @@ def _untracked_file_blocks(max_chars: int) -> str:
     return "".join(blocks)
 
 
+#: The driver appends phase events to a feature's log while an attempt runs
+#: (FEAT-LOOP-2026-0252). A captured attempt diff leaves those logs out: the
+#: lines are not the agent's work, and replaying their hunk over the preserved
+#: log (`apply_diff`) would not apply.
+_DRIVER_EVENT_LOGS_EXCLUDE = (
+    f":(top,exclude,glob){FEATURES_DIR.as_posix()}/*/events.jsonl")
+
+
 def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
     """Return the working tree's departure from `head_before`, capped.
 
@@ -5260,7 +5269,8 @@ def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
     """
     try:
         out = subprocess.run(
-            ["git", "diff", head_before],
+            ["git", "diff", head_before, "--", ":(top)",
+             _DRIVER_EVENT_LOGS_EXCLUDE],
             capture_output=True, text=True, check=True,
         ).stdout
     except (subprocess.CalledProcessError, OSError):
@@ -7132,6 +7142,7 @@ def _run_gate_set(
         else:
             popen_argv = command
             popen_kwargs = dict(shell=True)  # nosec B604
+        _progress.gate_started(gate["name"])
         gate_started = time.monotonic()
         proc = subprocess.Popen(  # nosec B602
             popen_argv, stdin=subprocess.DEVNULL,
@@ -7176,6 +7187,7 @@ def _run_gate_set(
                 f"or a wedged subprocess)."
             ]
         gate_duration = round(time.monotonic() - gate_started, 3)
+        _progress.gate_finished(gate["name"], ok, gate_duration)
         if not ok:
             failed_names.add(gate["name"])
         log_path = persist_gate_output(feature_dir, gate["name"], out)
@@ -8726,11 +8738,15 @@ def execute_unit_attempt(
     worklist_section = format_reverification_worklist(wu, feature_dir)
     if worklist_section:
         wu.body = wu.body + "\n\n" + worklist_section
+    _progress.agent_session_started()
     _agent_t0 = time.monotonic()
-    if dispatch_fn is None:
-        result = dispatch(wu, failure_note, cost_tracking)
-    else:
-        result = dispatch_fn(wu, failure_note)
+    try:
+        if dispatch_fn is None:
+            result = dispatch(wu, failure_note, cost_tracking)
+        else:
+            result = dispatch_fn(wu, failure_note)
+    finally:
+        _progress.agent_session_finished()
     agent_seconds = time.monotonic() - _agent_t0
     if isinstance(result, tuple):
         stdout, usage = result
@@ -12490,6 +12506,10 @@ def run(
             return 1
 
     try:
+        if not dry_run:
+            _progress.begin_run(
+                feature_id, feature_dir, events_path,
+                build_event=build_event, flush_events=flush_events)
 
         # Per-project cost-tracking toggle (top-level key in verification.yml,
         # default True). When True, the driver records cumulative cost / tokens
@@ -12610,6 +12630,7 @@ def run(
             if not pending:
                 break
             for wu in pending:  # sequential v1; the frontier is independent -> fan-out later
+                _progress.clear_unit()
                 # Per-gate cost budget brake — halt-between-WUs.
                 # Mirrors MAX_ATTEMPTS' shape (a brake, not an estimator). Fires
                 # before the next WU's set_wu(in_progress) so an in-progress WU
@@ -13116,6 +13137,7 @@ def run(
                     # What a kept earlier attempt left on disk, so this
                     # attempt's retry note lists only its own changes (#3612).
                     tree_before = snapshot_dirty_tree(head_before)
+                    _progress.begin_attempt(wu.wu_id, attempt, wu_max_attempts)
                     t0 = time.monotonic()
                     wu.last_gate_results = []
                     outcome, payload, usage = execute_unit_attempt(
@@ -13146,7 +13168,7 @@ def run(
                     # as an untouched tree (FEAT-LOOP-2026-0251).
                     _refusal_touched = git_diff_names(
                         head_before, "HEAD", worktree=True,
-                        exclude=(wu.file,))
+                        exclude=(wu.file, events_path))
 
                     if outcome == "zero_token":
                         # Agent never produced output (input_tokens=0). Skip
@@ -14601,6 +14623,9 @@ def run(
         )
         return 1
     finally:
+        # Before the lock is released, so no second driver's status is
+        # overwritten.
+        _progress.end_run()
         if lock_fd is not None:
             lock_fd.close()
 
