@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 walking skeleton: a scheduler for `_run_gate_set()` bounded by `max_parallel`",
+          "id": "FEAT-LOOP-2026-0253/T01",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 timeouts, events and the status file under parallel gates",
+          "id": "FEAT-LOOP-2026-0253/T02",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T03 \u2014 reuse a passing gate whose declared inputs are unchanged",
+          "id": "FEAT-LOOP-2026-0253/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T04 \u2014 refuse bad `max_parallel` and `inputs:` values, and document both",
+          "id": "FEAT-LOOP-2026-0253/T04",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE \u2014 terminal close",
+          "id": "FEAT-LOOP-2026-0253/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

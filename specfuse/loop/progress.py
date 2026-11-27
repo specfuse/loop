@@ -10,6 +10,10 @@ once (never through a unit's buffered `wu_events`), rewrites the status file
 no ANSI. While an attempt runs, a heartbeat thread also rewrites the status
 file, so its elapsed time and touched files stay current.
 
+Gates may run in parallel (FEAT-LOOP-2026-0253), so `gate_started` and
+`gate_finished` arrive from worker threads. One lock serialises every write to
+`events.jsonl` and the status file; it is held for a write, never for a gate.
+
 Every function is a no-op unless `begin_run` was called, so a caller that runs
 a gate set or an attempt outside `run()` writes nothing.
 
@@ -69,6 +73,7 @@ class _Run:
     max_attempts: "int | None" = None
     phase: str = PHASE_BETWEEN
     gate: "str | None" = None
+    gates_running: "list[str]" = field(default_factory=list)  # start order
     started_at: str = ""
     started_clock: float = 0.0
     agent_clock: float = 0.0
@@ -77,9 +82,10 @@ class _Run:
 
 _run: "_Run | None" = None
 _heartbeat: "tuple[threading.Thread, threading.Event] | None" = None
-# The heartbeat and the driver both rewrite the status file, through the same
-# temporary name.
-_status_lock = threading.Lock()
+# The heartbeat, the driver and parallel gate threads rewrite the status file
+# through the same temporary name, and gate threads append to `events.jsonl`.
+# Reentrant: a gate change holds it across its own status and event writes.
+_write_lock = threading.RLock()
 
 
 def _now() -> str:
@@ -113,7 +119,7 @@ def write_status(feature_dir: Path, status: dict) -> None:
 
 def _rewrite_status(stop_reason: "str | None" = None) -> None:
     run = _run
-    with _status_lock:
+    with _write_lock:
         write_status(run.feature_dir, {
             "feature": run.feature,
             "wu_id": run.wu_id,
@@ -121,6 +127,7 @@ def _rewrite_status(stop_reason: "str | None" = None) -> None:
             "max_attempts": run.max_attempts,
             "phase": run.phase,
             "gate": run.gate,
+            "gates_running": list(run.gates_running),
             "started_at": run.started_at,
             "updated_at": _now(),
             "elapsed_seconds": round(time.monotonic() - run.started_clock, 3),
@@ -131,8 +138,14 @@ def _rewrite_status(stop_reason: "str | None" = None) -> None:
 
 def _append_event(event_type: str, payload: dict) -> None:
     run = _run
-    run.flush_events(run.events_path, [run.build_event(
-        event_type, run.wu_id or run.feature, payload)])
+    with _write_lock:
+        run.flush_events(run.events_path, [run.build_event(
+            event_type, run.wu_id or run.feature, payload)])
+
+
+def _clear_gates(run: _Run) -> None:
+    run.gate = None
+    run.gates_running = []
 
 
 def _plain(text: str) -> str:
@@ -161,7 +174,7 @@ def end_run(stop_reason: "str | None" = None) -> None:
         return
     stop_heartbeat()
     _run.phase = PHASE_STOPPED
-    _run.gate = None
+    _clear_gates(_run)
     _rewrite_status(stop_reason)
     _run = None
 
@@ -173,7 +186,7 @@ def begin_attempt(wu_id: str, attempt: int, max_attempts: int) -> None:
     _run.attempt = attempt
     _run.max_attempts = max_attempts
     _run.phase = PHASE_BETWEEN
-    _run.gate = None
+    _clear_gates(_run)
     _run.files_touched = []
     _restart_clock(_run)
     _rewrite_status()
@@ -227,7 +240,7 @@ def clear_unit() -> None:
     _run.wu_id = _run.attempt = _run.max_attempts = None
     _run.files_touched = []
     _run.phase = PHASE_BETWEEN
-    _run.gate = None
+    _clear_gates(_run)
     _restart_clock(_run)
     _rewrite_status()
 
@@ -236,7 +249,7 @@ def agent_session_started() -> None:
     if _run is None:
         return
     _run.phase = PHASE_AGENT
-    _run.gate = None
+    _clear_gates(_run)
     _run.agent_clock = time.monotonic()
     _rewrite_status()
     _append_event("agent_session_started", {"attempt": _run.attempt})
@@ -256,23 +269,30 @@ def agent_session_finished() -> None:
 def gate_started(name: str) -> None:
     if _run is None:
         return
-    _run.phase = PHASE_GATE
-    _run.gate = name
-    _rewrite_status()
-    _append_event("gate_started", {"attempt": _run.attempt, "gate": name})
-    _say(f"gate {name} started")
+    with _write_lock:
+        _run.phase = PHASE_GATE
+        _run.gates_running.append(name)
+        _run.gate = name
+        _rewrite_status()
+        _append_event("gate_started", {"attempt": _run.attempt, "gate": name})
+        _say(f"gate {name} started")
 
 
 def gate_finished(name: str, ok: bool, duration_seconds: float) -> None:
     if _run is None:
         return
-    _run.phase = PHASE_BETWEEN
-    _run.gate = None
-    _rewrite_status()
-    _append_event("gate_finished", {
-        "attempt": _run.attempt, "gate": name, "ok": bool(ok),
-        "duration_seconds": duration_seconds})
-    _say(f"gate {name} {'PASS' if ok else 'FAIL'} ({duration_seconds:.1f}s)")
+    with _write_lock:
+        if name in _run.gates_running:
+            _run.gates_running.remove(name)
+        running = _run.gates_running
+        _run.phase = PHASE_GATE if running else PHASE_BETWEEN
+        _run.gate = running[-1] if running else None
+        _rewrite_status()
+        _append_event("gate_finished", {
+            "attempt": _run.attempt, "gate": name, "ok": bool(ok),
+            "duration_seconds": duration_seconds})
+        _say(f"gate {name} {'PASS' if ok else 'FAIL'} "
+             f"({duration_seconds:.1f}s)")
 
 
 _NOTIFY_TIMEOUT_SECONDS = 30
@@ -459,8 +479,8 @@ def _write_stop_reason(stop: _Stop, reason: str) -> None:
         "max_attempts": None, "started_at": now, "elapsed_seconds": 0.0,
         "files_touched": [],
     }
-    status.update(phase=PHASE_STOPPED, gate=None, updated_at=now,
-                  stop_reason=reason)
+    status.update(phase=PHASE_STOPPED, gate=None, gates_running=[],
+                  updated_at=now, stop_reason=reason)
     write_status(stop.feature_dir, status)
 
 

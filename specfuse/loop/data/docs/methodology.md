@@ -626,6 +626,17 @@ A unit that passes its own checks but would fail the real gate has done the wron
 thing. Keep the loop's `verification.yml` `code` set in lock-step with branch
 protection wherever both exist.
 
+**Parallel and cached gates (FEAT-LOOP-2026-0253).** Both are off by default.
+With `defaults.max_parallel` above 1 in `verification.yml`, gates of one set run
+concurrently, each only after every gate it `needs` has passed, and results keep
+the set's order. A gate declaring `inputs:` (git pathspec globs) may, in the
+per-attempt verify only, reuse its earlier `PASS`, reported `PASS (cached)`, when
+its command and the matching files are unchanged. The cache never serves the
+once-per-gate broad run, the baseline probe, the `feature_oracle` or a gate
+another gate `needs`, so no gate-level or terminal verdict rests on a reused
+result. A bad value for either key is a `CONFIGURATION ERROR` before any gate
+runs.
+
 ### 5.1 Operator scripts are software, not docs
 
 A unit that ships an **executable artifact for human operators** — a committed

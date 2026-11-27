@@ -43,6 +43,27 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-loop-2026-0253"></a>
+## FEAT-LOOP-2026-0253 — Run independent verification gates in parallel, and reuse a passing gate whose inputs are unchanged
+
+**Why.** `_run_gate_set()` runs a gate set one command at a time, and every retry runs the whole set again, including gates whose inputs the retry did not touch. An operator report measured 48 of 184 attempts retried, each paying the full set (12 independent commands in that project).
+
+**Goal.** Opt-in `defaults.max_parallel` runs gates whose `needs:` are met concurrently, with results in declared order. A gate declaring `inputs:` reuses its earlier PASS in the per-attempt verify when its command and matching files are unchanged (`PASS (cached)`). The broad run, the baseline probe, the `feature_oracle` and any gate another gate needs always run fresh.
+
+**Shape.** One gate, four implementation units and a terminal close; `auto`.
+
+**Out of scope.** Parallel work units (FEAT-LOOP-2026-0105), caching across features or machines, caching a FAIL, inferring inputs, and changes to `scripts/smoke-test.sh` or CI.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- In a project with several independent gates, set `defaults.max_parallel: 4` and compare
+  one attempt's `gate_result` durations and the attempt's `verify_seconds` with a run at 1.
+- In a project with per-package test gates, declare `inputs:` on one gate, force a retry that
+  touches another package, and confirm the gate reports `PASS (cached)` on the retry and runs
+  fresh in the gate's broad run.
+
 <a id="feat-loop-2026-0252"></a>
 ## FEAT-LOOP-2026-0252 — Show a running unit's progress, and notify when the driver stops
 
