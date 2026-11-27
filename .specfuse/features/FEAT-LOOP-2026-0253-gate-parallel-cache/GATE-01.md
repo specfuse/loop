@@ -3,6 +3,11 @@ gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_gate_parallel_cache -v -b"
 cost_budget_usd: 19.00
+broad_run:
+  tree: 07bbf72d1e7af3c1a03af605f40e5563dc3a18db:0ec7c6da6e74f0b56753f09657b654a6d289b91b:12064a6191eeb830a9826d911a8543fbaba3da75:23fbe3070712b42ba64796bd4272c075122f6593:27968248a450a842ccd187b7dce0fb0ded934866:287efde8f90320baffac08f5f3287b9456a65cb9:2e29b2f7e073a0cbe290f01d3b397e1cdd10c81c:42796ea0e0a6c03811b0e4bc9dbd3b5ee62dd2e4:44fcd7baef65f2a417d980e0023fb593a7292cc7:4acc6dfc5e8cece358c167d876515eba4a39a500:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:8e461a12f3893b4e2cd07a4871f27fe6ccefbca6:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d552e54a0ba41de9fa43f208adfe687f7ade34ee:d74b7d113b844e84f0009098f576fd28477f072d:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:fa2f4f88657587b6e3b560977858810846b1d366
+  ran_at: 2026-11-27T04:59:00.618187+00:00
+  ok: true
+  failing: []
 ---
 
 # Gate 1 — independent gates can run concurrently, and an unchanged passing gate can be reused on a retry
