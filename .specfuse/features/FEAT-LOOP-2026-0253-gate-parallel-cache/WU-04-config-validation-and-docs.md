@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0253/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - specfuse/loop/loop.py
@@ -15,6 +15,13 @@ produces_driver_helper:
   - order_gate_set
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T04:48:50.873223+00:00
+duration_seconds: 136.838
+cost_usd: 0.370864
+input_tokens: 20
+output_tokens: 6699
 ---
 
 # T04 — refuse bad `max_parallel` and `inputs:` values, and document both

@@ -57,6 +57,26 @@
 # they cannot disagree with the driver about whether a prerequisite ran
 # (FEAT-2026-0102).
 #
+# `defaults.max_parallel` (optional, default 1; FEAT-LOOP-2026-0253). How many
+# gates of one set may run at once, written as `max_parallel: 4` under the
+# top-level `defaults:` block. 1 runs the set one gate at a time. Above 1, a
+# gate starts only once every gate it `needs` has finished and passed, and
+# results are still reported in the set's order. Gates with no `needs:` edge
+# between them must be safe to run concurrently (no shared output files or
+# ports). Anything other than an integer >= 1 is a CONFIGURATION ERROR.
+#
+# PER-GATE `inputs: [<git pathspec>]` (optional, default none;
+# FEAT-LOOP-2026-0253). Opts the gate into the result cache: a per-attempt
+# verification reports `PASS (cached)`, without running the command, when the
+# command and every tracked or untracked, non-ignored file matching these
+# pathspecs are unchanged since an earlier PASS. List EVERY file that can
+# change the gate's verdict; a gate whose verdict depends on the whole tree or
+# on anything outside it should declare none. Only a PASS is stored, in
+# `<feature>/work/gate-cache.json`. The cache never serves the once-per-gate
+# broad run, the baseline probe, the `feature_oracle`, or a gate another gate
+# `needs`: those always run fresh. A value that is not a non-empty list of
+# non-empty strings is a CONFIGURATION ERROR.
+#
 # PER-GATE `tier: broad` (optional, FEAT-2026-0109/T04). A per-attempt
 # verification runs only the gates in the `code:` list that do NOT declare
 # `tier: broad`; the once-per-gate broad run runs all of them, tiered or not.

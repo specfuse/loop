@@ -543,10 +543,32 @@ class TestNeverForAVerdict(_CachedGates):
                 self.assertNotIn("PASS (cached)", report)
 
 
-@unittest.skip("FEAT-LOOP-2026-0253/T04")
-class TestConfigurationErrors(unittest.TestCase):
-    def test_pending(self):
-        self.fail("not implemented")
+class TestConfigurationErrors(_CachedGates):
+    def assert_refused(self, cfg, key):
+        wu = loop.WorkUnit(
+            wu_id="FEAT-2026-9001/T01", type="implementation", model="m",
+            status="pending", attempts=0, title="t", body="", depends_on=[],
+            file=self.feature_dir / "WU.md")
+        ok, report = loop.verify(wu, self.feature_dir, cfg=cfg)
+        self.assertFalse(ok)
+        self.assertIn("CONFIGURATION ERROR", report)
+        self.assertIn(key, report)
+        self.assertEqual(self.count(), 0)
+
+    def test_bad_max_parallel(self):
+        for bad in (0, -1, "2", 1.5):
+            with self.subTest(max_parallel=bad):
+                self.assert_refused(
+                    {"defaults": {"max_parallel": bad},
+                     "code": [self.gate()]},
+                    "max_parallel")
+
+    def test_bad_inputs(self):
+        for bad in ("src/", [], [""], [3]):
+            with self.subTest(inputs=bad):
+                gate = self.gate(inputs=None)
+                gate["inputs"] = bad
+                self.assert_refused({"code": [gate]}, "inputs")
 
 
 if __name__ == "__main__":

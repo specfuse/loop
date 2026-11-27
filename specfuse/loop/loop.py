@@ -6978,7 +6978,7 @@ def select_gate_report_lines(
     return tail + [_NO_VERDICT_NOTE]
 
 
-def order_gate_set(gate_set: list) -> list:
+def order_gate_set(gate_set: list, verification_cfg: "dict | None" = None) -> list:
     """Order *gate_set* so a gate declaring `needs: [<gate>]` runs after its
     dependency (FEAT-2026-0102/T01), preserving declared relative order among
     gates with no edge between them (a stable topological sort).
@@ -6987,7 +6987,28 @@ def order_gate_set(gate_set: list) -> list:
     `needs` target absent from the set or the set contains a `needs` cycle —
     both are configuration errors the caller turns into the same
     "CONFIGURATION ERROR" shape used for an unknown `extra_gates` name.
+
+    The same applies to a gate `inputs:` that is not a non-empty list of
+    non-empty strings, and to a `defaults.max_parallel` in *verification_cfg*
+    that is not an integer >= 1 (FEAT-LOOP-2026-0253/T04).
     """
+    defaults = (verification_cfg or {}).get("defaults") or {}
+    if "max_parallel" in defaults:
+        limit = defaults["max_parallel"]
+        if type(limit) is not int or limit < 1:
+            raise ValueError(
+                f"`defaults.max_parallel` must be an integer >= 1, got {limit!r}"
+            )
+    for gate in gate_set:
+        if "inputs" not in gate:
+            continue
+        inputs = gate["inputs"]
+        if not (isinstance(inputs, list) and inputs
+                and all(isinstance(spec, str) and spec for spec in inputs)):
+            raise ValueError(
+                f"gate {gate['name']!r} declares `inputs: {inputs!r}` but it "
+                f"must be a non-empty list of non-empty strings"
+            )
     by_name = {gate["name"]: gate for gate in gate_set}
     for gate in gate_set:
         for dep in gate.get("needs") or []:
@@ -7477,7 +7498,7 @@ def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bo
             ),
         }]
     try:
-        gate_set = order_gate_set(gate_set)
+        gate_set = order_gate_set(gate_set, cfg)
     except ValueError as exc:
         return False, [{
             "gate": "configuration",
@@ -8183,7 +8204,7 @@ def verify(wu: WorkUnit, feature_dir: Path,
             seen_names.add(gate["name"])
             gate_set.append(gate)
     try:
-        gate_set = order_gate_set(gate_set)
+        gate_set = order_gate_set(gate_set, cfg)
     except ValueError as exc:
         return False, (
             f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
@@ -8300,7 +8321,7 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
     _PHASE_GATE_RESULTS["baseline"] = []
     gate_set = cfg.get("code") or []
     try:
-        gate_set = order_gate_set(gate_set)
+        gate_set = order_gate_set(gate_set, cfg)
     except ValueError as exc:
         return [{
             "gate": "configuration",
