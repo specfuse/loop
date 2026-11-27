@@ -5,7 +5,7 @@ slug: gate-parallel-cache
 branch: feat/FEAT-LOOP-2026-0253-gate-parallel-cache
 roadmap_goal: A project can opt in to running gates whose `needs:` are met concurrently (`defaults.max_parallel`) and to reusing a gate's earlier PASS on a retry when the files it declares as `inputs:` are unchanged, without changing any verdict the gate's fresh broad run or a close reads.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 15.00
 ---
 

@@ -131,7 +131,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0250 | Record verification gate results and durations | done | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ archive](roadmap-archive.md#feat-loop-2026-0250) |
 | FEAT-LOOP-2026-0251 | Refuse a missing deliverable before the verification gates run | done | `.specfuse/features/FEAT-LOOP-2026-0251-fail-fast-deliverables/` | [→ archive](roadmap-archive.md#feat-loop-2026-0251) |
 | FEAT-LOOP-2026-0252 | Show a running unit's progress, and notify when the driver stops | done | `.specfuse/features/FEAT-LOOP-2026-0252-run-progress/` | [→ archive](roadmap-archive.md#feat-loop-2026-0252) |
-| FEAT-LOOP-2026-0253 | Run independent verification gates in parallel, and reuse a passing gate whose inputs are unchanged | active | `.specfuse/features/FEAT-LOOP-2026-0253-gate-parallel-cache/` | [→ detail](#feat-loop-2026-0253) |
+| FEAT-LOOP-2026-0253 | Run independent verification gates in parallel, and reuse a passing gate whose inputs are unchanged | done | `.specfuse/features/FEAT-LOOP-2026-0253-gate-parallel-cache/` | [→ archive](roadmap-archive.md#feat-loop-2026-0253) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1061,19 +1061,6 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
 
 **Status: planned.**
-
-<a id="feat-loop-2026-0253"></a>
-## FEAT-LOOP-2026-0253 — Run independent verification gates in parallel, and reuse a passing gate whose inputs are unchanged
-
-**Why.** `_run_gate_set()` runs a gate set one command at a time, and every retry runs the whole set again, including gates whose inputs the retry did not touch. An operator report measured 48 of 184 attempts retried, each paying the full set (12 independent commands in that project).
-
-**Goal.** Opt-in `defaults.max_parallel` runs gates whose `needs:` are met concurrently, with results in declared order. A gate declaring `inputs:` reuses its earlier PASS in the per-attempt verify when its command and matching files are unchanged (`PASS (cached)`). The broad run, the baseline probe, the `feature_oracle` and any gate another gate needs always run fresh.
-
-**Shape.** One gate, four implementation units and a terminal close; `auto`.
-
-**Out of scope.** Parallel work units (FEAT-LOOP-2026-0105), caching across features or machines, caching a FAIL, inferring inputs, and changes to `scripts/smoke-test.sh` or CI.
-
-**Status: active.**
 
 ## Notes
 
