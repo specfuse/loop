@@ -357,9 +357,14 @@ per-criterion findings verbatim to `FOLLOW-UPS.md` (appending, never
 overwriting the close's own entries), and fires no terminal flips. On `met`
 over a close's `not_met` the disagreement is recorded and *not* acted on: a
 second opinion must not overrule the session that actually ran the oracles and
-found them red. A judge that times out, cannot be run, or returns unreadable
-output leaves the close's verdict standing — the judge is a check, not a
-dependency, and a defect in its path fails open, loudly.
+found them red. A judge that times out (after 30 minutes), cannot be run,
+returns unreadable output or hits a defect in its own path gives no verdict.
+The close's verdict is then kept as written, but an unjudged `met` does not
+finish the feature: the terminal flips are withheld and the run halts with
+`judge_unavailable_terminal` (#3620). The operator either re-arms the close so
+the judge runs again, or accepts the close without a judge by setting
+`judge_disabled: true` with their own reason and re-arming it. An unjudged
+`not_met` needs nothing: it fires no flips anyway.
 
 **The `judged` event** is written for every terminal close, including the ones
 where no judge ran, so "the judge never fired" is an auditable record rather

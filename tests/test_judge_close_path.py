@@ -327,55 +327,93 @@ class TestJudgeAgrees(JudgeClosePathCase):
 
 
 class TestJudgeUnusable(JudgeClosePathCase):
+    """#3620: on a terminal gate, a judge that gives no verdict (timeout,
+    cannot run, unreadable output, or a defect in its path) must not let the
+    close's own `met` fire the terminal flips. The close's verdict is kept as
+    written, the flips are withheld and the run halts for a human."""
 
-    def _assert_close_verdict_stood(self, root: Path, fdir: Path,
-                                    feature_id: str) -> dict:
+    def _assert_flips_withheld(self, fdir: Path, output: str) -> dict:
         wu_fm = _read_frontmatter(fdir / "WU-close.md")
         self.assertEqual(wu_fm.get("verdict"), "met",
                          "an unusable judge must leave the close's verdict alone")
         plan_fm = _read_frontmatter(fdir / "PLAN.md")
-        self.assertEqual(plan_fm.get("status"), "done",
-                         "flips must follow the close's own verdict")
+        self.assertEqual(plan_fm.get("status"), "active",
+                         "an unjudged met must not flip PLAN.md to done")
+        gate_fm = _read_frontmatter(fdir / "GATE-01.md")
+        self.assertNotEqual(gate_fm.get("status"), "passed",
+                            "an unjudged met must not pass the terminal gate")
         judged = _events(fdir, "judged")
         self.assertEqual(len(judged), 1)
         payload = judged[0]["payload"]
-        self.assertIsNone(payload.get("judge_verdict"),
-                          "an unusable judge records judge_verdict: null")
+        self.assertIsNone(payload.get("judge_verdict"))
+        self.assertTrue(payload.get("unjudged"))
         self.assertTrue((payload.get("reason") or "").strip(),
                         "a null judge verdict must carry a reason")
+        halts = [e for e in _events(fdir, "human_escalation")
+                 if e["payload"].get("reason") == "judge_unavailable_terminal"]
+        self.assertEqual(len(halts), 1, output)
+        self.assertIn(payload["reason"], halts[0]["payload"].get("judge_reason", ""))
+        self.assertIn("judge_unavailable_terminal", output)
         return payload
 
-    def test_judge_timeout_or_garbage_leaves_close_verdict(self):
-        """A timed-out judge and a garbage-emitting judge both fail open."""
-        # (a) the session runs past its wall clock
+    def test_judge_timeout_withholds_the_flips(self):
+        def timing_out(prompt, *, timeout=None):
+            raise subprocess.TimeoutExpired(cmd=["claude"], timeout=timeout or 1)
+
         with integration_workspace() as root:
             os.chdir(root)
-            feature_id = "FEAT-2026-9804"
-            fdir = self._write_feature(root, feature_id, close_verdict="met")
-
-            def timing_out(prompt, *, timeout=None):
-                raise subprocess.TimeoutExpired(cmd=["claude"], timeout=timeout or 900)
-
+            fdir = self._write_feature(root, "FEAT-2026-9804", close_verdict="met")
             self._install_stubs(fdir, "met", timing_out)
-            self._run()
-            payload = self._assert_close_verdict_stood(root, fdir, feature_id)
+            payload = self._assert_flips_withheld(fdir, self._run())
             self.assertIn("timed out", payload["reason"])
 
-        for name, original in self._patches:
-            setattr(loop, name, original)
-        self._patches = []
-
-        # (b) the session answers, but not with a verdict
+    def test_unreadable_judge_withholds_the_flips(self):
         with integration_workspace() as root:
             os.chdir(root)
-            feature_id = "FEAT-2026-9805"
-            fdir = self._write_feature(root, feature_id, close_verdict="met")
+            fdir = self._write_feature(root, "FEAT-2026-9805", close_verdict="met")
             self._install_stubs(
                 fdir, "met",
-                self._recording_runner("I could not decide. Sorry.\n"),
-            )
+                self._recording_runner("I could not decide. Sorry.\n"))
+            self._assert_flips_withheld(fdir, self._run())
+
+    def test_judge_that_cannot_run_withholds_the_flips(self):
+        def missing(prompt, *, timeout=None):
+            raise FileNotFoundError("claude")
+
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = self._write_feature(root, "FEAT-2026-9806", close_verdict="met")
+            self._install_stubs(fdir, "met", missing)
+            self._assert_flips_withheld(fdir, self._run())
+
+    def test_judge_path_defect_withholds_the_flips(self):
+        def broken(prompt, *, timeout=None):
+            raise RuntimeError("judge path defect")
+
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = self._write_feature(root, "FEAT-2026-9807", close_verdict="met")
+            self._install_stubs(fdir, "met", broken)
+            payload = self._assert_flips_withheld(fdir, self._run())
+            self.assertIn("RuntimeError", payload["reason"])
+
+    def test_not_met_close_with_a_timed_out_judge_does_not_halt(self):
+        """Nothing to withhold: a not_met close fires no flips anyway."""
+        def timing_out(prompt, *, timeout=None):
+            raise subprocess.TimeoutExpired(cmd=["claude"], timeout=timeout or 1)
+
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = self._write_feature(root, "FEAT-2026-9808",
+                                       close_verdict="not_met")
+            self._install_stubs(fdir, "not_met", timing_out)
             self._run()
-            self._assert_close_verdict_stood(root, fdir, feature_id)
+            self.assertEqual(
+                _read_frontmatter(fdir / "WU-close.md").get("verdict"), "not_met")
+            self.assertEqual(
+                [e for e in _events(fdir, "human_escalation")
+                 if e["payload"].get("reason") == "judge_unavailable_terminal"],
+                [])
 
 
 class TestJudgeDisabled(JudgeClosePathCase):
@@ -455,8 +493,9 @@ class TestJudgeDispatchArgv(unittest.TestCase):
         self.assertNotIn("{model}", " ".join(cmd))
         self.assertNotIn("{effort}", " ".join(cmd))
 
-    def test_timeout_is_fifteen_minutes(self):
-        self.assertEqual(loop.JUDGE_TIMEOUT_SECONDS, 15 * 60)
+    def test_timeout_is_thirty_minutes(self):
+        # #3620: real judges re-running a gate's oracles took 20-26 minutes.
+        self.assertEqual(loop.JUDGE_TIMEOUT_SECONDS, 30 * 60)
 
 
 class TestJudgeDisabledFlagReading(unittest.TestCase):
