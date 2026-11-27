@@ -337,8 +337,58 @@ def _read_wu(feature_dir: Path, ref: dict) -> "dict | None":
     }
 
 
-def _matches_judge_path(path: str) -> bool:
-    return any(path == jp or path.startswith(jp) for jp in JUDGE_PATHS)
+def _matches_judge_path(path: str, judge_paths: "tuple[str, ...]" = JUDGE_PATHS) -> bool:
+    return any(path == jp or path.startswith(jp) for jp in judge_paths)
+
+
+_TREE_REGISTRY = "specfuse/loop/arm_eval.py"
+
+
+def _repo_root_of(feature_dir: Path) -> "Path | None":
+    """`<root>` for a feature folder at `<root>/.specfuse/features/<F>`."""
+    resolved = Path(feature_dir).resolve()
+    if resolved.parent.name == "features" and resolved.parent.parent.name == ".specfuse":
+        return resolved.parent.parent.parent
+    return None
+
+
+def judge_paths_for_tree(feature_dir: Path) -> "tuple[str, ...]":
+    """The judge paths the terminal check applies to *feature_dir*'s gate:
+    this build's `JUDGE_PATHS`, plus those of the tree's own registry when
+    the tree carries one (#3551).
+
+    The driver runs from the build it pinned at process start, so a gate unit
+    that adds a module to `JUDGE_MODULES` changes the tree's registry, not the
+    running one. Read only for the terminal check, as the union with this
+    build's list (never narrower than either), and only when the tree has its
+    own `specfuse/loop/arm_eval.py` (this repository; a consumer project has
+    none). A registry that cannot be loaded leaves this build's list.
+    """
+    root = _repo_root_of(feature_dir)
+    tree_file = root / _TREE_REGISTRY if root is not None else None
+    if tree_file is None or not tree_file.is_file():
+        return JUDGE_PATHS
+    try:
+        if tree_file.resolve() == Path(__file__).resolve():
+            return JUDGE_PATHS
+        import importlib.util
+        import sys
+        name = f"{__package__}._tree_arm_eval"
+        spec = importlib.util.spec_from_file_location(name, tree_file)
+        if spec is None or spec.loader is None:
+            return JUDGE_PATHS
+        module = importlib.util.module_from_spec(spec)
+        # Registered while it executes: its dataclasses look themselves up.
+        sys.modules[name] = module
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            sys.modules.pop(name, None)
+        tree_paths = tuple(p for p in getattr(module, "JUDGE_PATHS", ())
+                           if isinstance(p, str))
+    except (Exception, SystemExit):  # noqa: BLE001 - fall back to this build
+        return JUDGE_PATHS
+    return JUDGE_PATHS + tuple(p for p in tree_paths if p not in JUDGE_PATHS)
 
 
 def _is_glob_or_directory(path: str) -> bool:
@@ -647,6 +697,7 @@ def _terminal_judge_hits(
     acknowledgement (or None). Shared by the verdict and the brief's key list so
     the two cannot disagree on what an acknowledgement must name."""
     feature_dir = Path(feature_dir)
+    judge_paths = judge_paths_for_tree(feature_dir)
     plan = load_plan_graph(feature_dir)
     gate = next(
         (g for g in plan.get("gates", []) or [] if g.get("gate") == gate_number),
@@ -663,7 +714,7 @@ def _terminal_judge_hits(
         if wu["type"] in NON_SUBSTANTIVE_TYPES or wu["status"] != "done":
             continue
         for p in wu["produces"]:
-            if _matches_judge_path(p):
+            if _matches_judge_path(p, judge_paths):
                 hits.append((p, f"{wu['id']} produces {p}"))
         if wu["produces_driver_helper"]:
             hits.append((
