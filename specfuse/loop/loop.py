@@ -4828,6 +4828,26 @@ def halt_for_human_unit(
 
 HALT_REASON_JUDGE_EDITING_TERMINAL = "judge_editing_terminal"
 
+#: A terminal close recorded `met` but its judge gave no verdict (#3620).
+HALT_REASON_JUDGE_UNAVAILABLE_TERMINAL = "judge_unavailable_terminal"
+
+
+def judge_unavailable_message(gate_number: int, judge_reason: str) -> str:
+    """What the operator reads when a terminal `met` was left unjudged."""
+    return (
+        f"\nGate {gate_number} complete, terminal flips withheld "
+        f"({HALT_REASON_JUDGE_UNAVAILABLE_TERMINAL}).\n"
+        "The close recorded verdict `met`, but the judge that reviews a "
+        f"terminal close gave no verdict: {judge_reason}. An unreviewed `met` "
+        "does not finish the feature, so the gate, the roadmap row and PLAN.md "
+        "were left un-flipped. The close's verdict is kept as written.\n"
+        "Next, either:\n"
+        "  - re-run the close so the judge runs again: re-arm the close unit "
+        "(/unblock-wu) and `specfuse run`; or\n"
+        "  - accept the close without a judge: set `judge_disabled: true` in "
+        "PLAN.md frontmatter with your own reason, re-arm the close and run."
+    )
+
 
 def stop_for_terminal_judge_edit(
     wu: "WorkUnit",
@@ -11267,7 +11287,7 @@ JUDGE_EFFORT = "medium"
 
 #: Wall clock for one judge session. Generous enough to re-run a gate's
 #: oracles, short enough that a hung session cannot strand a finished close.
-JUDGE_TIMEOUT_SECONDS = 15 * 60
+JUDGE_TIMEOUT_SECONDS = 30 * 60
 
 #: PLAN.md frontmatter escape hatch. One reader (this module), no behaviour
 #: beyond skipping the dispatch — see GATE-01's arming discipline on why it is
@@ -11563,13 +11583,15 @@ def judge_close(
         payload["reason"] = (
             f"the judge session timed out after {JUDGE_TIMEOUT_SECONDS}s"
         )
+        payload["unjudged"] = True
         print(f"   JUDGE TIMEOUT — {payload['reason']}; the close's verdict "
-              f"({close_verdict}) stands")
+              f"({close_verdict}) is kept, unjudged")
         return payload
     except OSError as exc:
         payload["reason"] = f"the judge session could not be run: {exc}"
+        payload["unjudged"] = True
         print(f"   JUDGE UNAVAILABLE — {payload['reason']}; the close's "
-              f"verdict ({close_verdict}) stands")
+              f"verdict ({close_verdict}) is kept, unjudged")
         return payload
     if usage:
         payload["usage"] = usage
@@ -11578,8 +11600,9 @@ def judge_close(
     payload["judge_verdict"] = result.verdict
     if result.verdict is None:
         payload["reason"] = result.reason or "the judge returned no verdict"
+        payload["unjudged"] = True
         print(f"   JUDGE UNREADABLE — {payload['reason']}; the close's "
-              f"verdict ({close_verdict}) stands")
+              f"verdict ({close_verdict}) is kept, unjudged")
         return payload
 
     payload["findings"] = len(result.findings)
@@ -12912,6 +12935,7 @@ def run(
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         close_wu_completed = None  # any close with a well-formed verdict (#3243)
+        judge_unavailable_reason = None  # terminal met left unjudged (#3620)
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
 
         # No gate-entry baseline probe (FEAT-2026-0109/T01 — supersedes the
@@ -14085,17 +14109,19 @@ def run(
                             # Terminal closes only — an intermediate gate keeps
                             # its ceremony until its next-gate plan is itself
                             # judged.
+                            _judged = None
                             if gate is gates[-1]:
                                 try:
                                     _judged = judge_close(
                                         wu, feature_dir, REPO_ROOT, gate=gate,
                                     )
                                 except Exception as _exc:  # noqa: BLE001
-                                    # A defect in the judge path must not veto
-                                    # a close that already passed every gate.
-                                    # Fail open, loudly, with the exception in
-                                    # the event rather than swallowed.
+                                    # A defect in the judge path neither vetoes
+                                    # nor passes the close: it is recorded as
+                                    # unjudged and, over a `met`, withholds
+                                    # the terminal flips below (#3620).
                                     _judged = {
+                                        "unjudged": True,
                                         "gate": gate.number,
                                         "close_verdict": wu.verdict,
                                         "judge_verdict": None,
@@ -14124,7 +14150,30 @@ def run(
                             wu_fm_post, _ = read_frontmatter(wu.file)
                             wu.verdict = wu_fm_post.get("verdict") or None
                             close_wu_completed = wu
-                            if verdict_permits_terminal_flips(wu.verdict):
+                            # #3620: a terminal `met` no judge reviewed (timed
+                            # out, could not run, unreadable, or a defect in
+                            # its path) is neither vetoed nor passed. The
+                            # verdict stays as the close wrote it, the flips
+                            # are withheld and the run halts for a human.
+                            if (gate is gates[-1] and _judged is not None
+                                    and _judged.get("unjudged")
+                                    and verdict_permits_terminal_flips(
+                                        wu.verdict)):
+                                judge_unavailable_reason = (
+                                    _judged.get("reason") or "no judge verdict")
+                                wu_events.append(build_event(
+                                    "human_escalation", wu.wu_id, {
+                                        "reason":
+                                            HALT_REASON_JUDGE_UNAVAILABLE_TERMINAL,
+                                        "gate": gate.number,
+                                        "close_verdict": wu.verdict,
+                                        "judge_reason": judge_unavailable_reason,
+                                        "message": judge_unavailable_message(
+                                            gate.number,
+                                            judge_unavailable_reason),
+                                    }))
+                            if (verdict_permits_terminal_flips(wu.verdict)
+                                    and judge_unavailable_reason is None):
                                 close_wu_for_terminal = wu
                             else:
                                 # Hedged verdict: revert EVERY terminal surface
@@ -14890,6 +14939,10 @@ def run(
                 if ref_fm.get("type") == "close":
                     close_verdict = ref_fm.get("verdict") or None
                     break
+            if judge_unavailable_reason is not None:
+                print(judge_unavailable_message(
+                    gate.number, judge_unavailable_reason))
+                return 1
             print(terminal_gate_message(gate.number, close_verdict))
         else:
             print(f"\nGate {gate.number} complete (retro, lessons, docs, "
