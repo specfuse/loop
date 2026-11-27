@@ -4,6 +4,8 @@ First close of gate 1. One entry is open.
 
 ### Definition of done clause 6 (stop reason when the event log changes during `run()`)
 
+**Tracked as #3626.**
+
 **Criterion, verbatim:** "**Stop notification.** Each return from `run()` (and each exception
 out of it) sends exactly one notification. Its `stop_reason` is `halted` when this run wrote
 a `human_escalation`, else `awaiting_review` when it wrote `gate_reached` and the gate is
