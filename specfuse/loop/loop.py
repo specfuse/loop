@@ -663,6 +663,20 @@ def resolve_fail_fast_deliverables(verification_cfg: dict) -> bool:
     return bool(project.get("fail_fast_deliverables", True))
 
 
+def resolve_heartbeat_seconds(verification_cfg: dict) -> int:
+    """How often the status file is refreshed while an attempt runs
+    (FEAT-LOOP-2026-0252/T02).
+
+    Reads `defaults.heartbeat_seconds` from verification.yml. 30 when the key
+    is missing, not an integer or not positive.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    value = project.get("heartbeat_seconds")
+    if type(value) is int and value > 0:
+        return value
+    return 30
+
+
 def resolve_dispatch_skills(verification_cfg: dict) -> bool:
     """Whether a dispatched session gets the project's skills index (#3423).
 
@@ -3124,21 +3138,49 @@ def _path_state(path: str) -> "tuple[int, str] | None":
             hashlib.sha256(data).hexdigest())
 
 
-def _paths_differing_from(head: str) -> "set[str] | None":
+def _paths_differing_from(head: str, *,
+                          env: "dict | None" = None) -> "set[str] | None":
     """Every path whose working-tree state differs from *head*: tracked
     changes, staged or not, by both their old and new names (no rename
     pairing), plus untracked files. Names are read NUL-separated, so git
-    does not quote non-ASCII ones. None on any git error."""
+    does not quote non-ASCII ones. None on any git error. *env* replaces
+    git's environment."""
     try:
         tracked = subprocess.run(
             ["git", "diff", "--no-renames", "--name-only", "-z", head],
-            capture_output=True, text=True, check=True).stdout
+            capture_output=True, text=True, check=True, env=env).stdout
         untracked = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-            capture_output=True, text=True, check=True).stdout
+            capture_output=True, text=True, check=True, env=env).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
     return {p for p in (tracked + untracked).split("\0") if p}
+
+
+def heartbeat_files_touched(head: str,
+                            bookkeeping: "tuple[Path, ...]") -> "list | None":
+    """`_paths_differing_from(head)` less the driver's *bookkeeping* files,
+    matched by full path. None when git cannot list the tree.
+
+    It runs beside the session and the driver, and `git diff` rewrites a stale
+    index under `index.lock`. So git reads a scratch copy of the index, and
+    their own git calls never find the lock taken by this one.
+    """
+    try:
+        index = Path(git("rev-parse", "--git-path", "index")).resolve()
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp) / "index"
+            if index.exists():
+                # copy2 keeps the mtime git's racy-index check relies on.
+                shutil.copy2(index, scratch)
+            paths = _paths_differing_from(
+                head, env={**os.environ, "GIT_INDEX_FILE": str(scratch)})
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    if paths is None:
+        return None
+    skip = {Path(p).resolve() for p in bookkeeping}
+    return sorted(p for p in paths if Path(p).resolve() not in skip)
 
 
 @dataclass(frozen=True)
@@ -13063,6 +13105,7 @@ def run(
                 # MAX_ATTEMPTS. A malformed value raises here rather than
                 # silently reverting to 3.
                 wu_max_attempts = resolve_max_attempts(wu, load_verification())
+                heartbeat_seconds = resolve_heartbeat_seconds(load_verification())
                 # Convergent-iteration state (#2650); inert unless the unit
                 # opts in. `_best_diff` is the working-tree diff of the best
                 # attempt so far, replayed when a later attempt regresses so a
@@ -13140,12 +13183,19 @@ def run(
                     _progress.begin_attempt(wu.wu_id, attempt, wu_max_attempts)
                     t0 = time.monotonic()
                     wu.last_gate_results = []
-                    outcome, payload, usage = execute_unit_attempt(
-                        wu, feature_dir, failure_note, cost_tracking=cost_tracking,
-                        head_before=head_before, prerun_cfg=cfg,
-                        gate_file=gate.file,
-                        untracked_before=untracked_before,
-                    )
+                    _progress.start_heartbeat(heartbeat_seconds, functools.partial(
+                        heartbeat_files_touched, head_before,
+                        (wu.file, events_path, feature_dir / PROGRESS_FILENAME)))
+                    try:
+                        outcome, payload, usage = execute_unit_attempt(
+                            wu, feature_dir, failure_note,
+                            cost_tracking=cost_tracking,
+                            head_before=head_before, prerun_cfg=cfg,
+                            gate_file=gate.file,
+                            untracked_before=untracked_before,
+                        )
+                    finally:
+                        _progress.stop_heartbeat()
                     wu_events.extend(build_attempt_gate_events(wu, attempt))
                     duration = round(time.monotonic() - t0, 3)
                     attempt_record: dict = {"attempt": attempt,

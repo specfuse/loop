@@ -4,7 +4,7 @@
 #
 """FEAT-LOOP-2026-0252 gate 1 oracle — a running unit's progress is visible.
 One class per Definition-of-done clause in GATE-01.md. T01 implements clauses
-1, 2 and 4; the rest are skipped naming their owning unit.
+1, 2 and 4, T02 clause 3; the rest are skipped naming their owning unit.
 
 Every run goes through `loop.run()` in a temporary repository, with a stubbed
 agent session and two real stub gate commands. What must be on disk while the
@@ -21,6 +21,8 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -298,12 +300,106 @@ class TestDriverLines(_ObservedRun):
         self.assertNotIn("\x1b", self.run_seen.output)
 
 
-@unittest.skip("FEAT-LOOP-2026-0252/T02")
-class TestHeartbeat(unittest.TestCase):
-    """Clause 3 — owned by T02."""
+class _SessionBoom(Exception):
+    pass
 
-    def test_placeholder(self):
-        self.fail("T02 replaces this class")
+
+def _run_heartbeat_session(session_body):
+    """`loop.run()` with a one-second heartbeat and *session_body* as the
+    agent session. Returns what `run()` raised, or None."""
+    with integration_workspace() as root, \
+            tempfile.TemporaryDirectory() as snapshots:
+        cwd = os.getcwd()
+        os.chdir(root)
+        try:
+            fdir = _scaffold(root, Path(snapshots))
+            with (root / ".specfuse/verification.yml").open("a") as fh:
+                fh.write("defaults:\n  heartbeat_seconds: 1\n")
+            subprocess.run(["git", "commit", "-q", "-am", "heartbeat"],
+                           check=True)
+            rel = fdir.relative_to(root)
+
+            def session(wu, failure_note, cost_tracking=True):
+                return session_body(wu, rel)
+
+            with mock.patch.object(loop, "dispatch", session), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                try:
+                    loop.run(None, dry_run=False)
+                except _SessionBoom as exc:
+                    return exc
+            return None
+        finally:
+            os.chdir(cwd)
+
+
+class TestHeartbeat(unittest.TestCase):
+    """Clause 3 — the status file is refreshed while an attempt runs."""
+
+    def test_status_refreshes_during_the_session(self):
+        before = set(threading.enumerate())
+        samples = []
+
+        def body(wu, rel):
+            Path("notes").mkdir(exist_ok=True)
+            Path("notes/a.txt").write_text("a\n")
+            deadline = time.monotonic() + 3.4
+            while time.monotonic() < deadline:
+                samples.append(json.loads(
+                    (rel / "work" / "STATUS.json").read_text()))
+                time.sleep(0.05)
+            self.during = set(threading.enumerate()) - before
+            write_stub_deliverable(wu)
+            return "```result\nstatus: complete\n```\n"
+
+        _run_heartbeat_session(body)
+
+        self.assertEqual({s["phase"] for s in samples}, {"agent"})
+        updates = list(dict.fromkeys(s["updated_at"] for s in samples))
+        self.assertGreaterEqual(len(updates) - 1, 2, updates)
+        last = samples[-1]
+        self.assertGreater(last["elapsed_seconds"],
+                           samples[0]["elapsed_seconds"])
+        self.assertIn("notes/a.txt", last["files_touched"])
+        for name in ("events.jsonl", "WU-T01.md", "PROGRESS.md"):
+            self.assertEqual(
+                [p for p in last["files_touched"] if p.endswith(name)], [])
+        self.assertTrue(self.during)
+        self.assertEqual(set(threading.enumerate()) - before, set())
+
+    def test_same_named_file_outside_the_feature_folder_is_listed(self):
+        seen = {}
+
+        def body(wu, rel):
+            Path("docs").mkdir(exist_ok=True)
+            Path("docs/PROGRESS.md").write_text("a\n")
+            time.sleep(1.6)
+            seen.update(json.loads((rel / "work" / "STATUS.json").read_text()))
+            write_stub_deliverable(wu)
+            return "```result\nstatus: complete\n```\n"
+
+        _run_heartbeat_session(body)
+        self.assertIn("docs/PROGRESS.md", seen["files_touched"])
+
+    def test_no_thread_survives_a_raising_session(self):
+        before = set(threading.enumerate())
+
+        def body(wu, rel):
+            self.during = set(threading.enumerate()) - before
+            raise _SessionBoom()
+
+        self.assertIsInstance(_run_heartbeat_session(body), _SessionBoom)
+        self.assertTrue(self.during)
+        self.assertEqual(set(threading.enumerate()) - before, set())
+
+    def test_resolve_heartbeat_seconds(self):
+        for cfg in ({}, {"defaults": {}}, None):
+            self.assertEqual(loop.resolve_heartbeat_seconds(cfg), 30)
+        for value, expected in (("x", 30), (0, 30), (-5, 30), (True, 30),
+                                (1.5, 30), (7, 7)):
+            with self.subTest(value=value):
+                self.assertEqual(loop.resolve_heartbeat_seconds(
+                    {"defaults": {"heartbeat_seconds": value}}), expected)
 
 
 @unittest.skip("FEAT-LOOP-2026-0252/T03")

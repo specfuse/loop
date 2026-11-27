@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0252/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/progress.py
@@ -14,6 +14,13 @@ produces_driver_helper:
   - resolve_heartbeat_seconds
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.33.2
+started_at: 2026-11-27T03:12:49.060381+00:00
+duration_seconds: 181.507
+cost_usd: 0.446125
+input_tokens: 18
+output_tokens: 11512
 ---
 
 # T02 — heartbeat while an attempt runs
