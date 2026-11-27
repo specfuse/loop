@@ -285,7 +285,7 @@ class _Stop:
     feature: str
     feature_dir: Path
     events_path: Path
-    events_offset: int
+    started_at: "dt.datetime"
     load_graph: Callable
     owns_status: bool = True
 
@@ -297,14 +297,15 @@ def remember_run(
     feature: str, feature_dir: Path, events_path: Path, *,
     load_graph: Callable,
 ) -> None:
-    """Call as the run starts, before it appends any event."""
+    """Call as the run starts, before it appends any event.
+
+    The run's events are later told apart by timestamp, not by a byte offset:
+    `run()` may check out the feature branch, whose `events.jsonl` can be
+    longer or shorter than the one the run started on (#3626).
+    """
     global _stop
-    try:
-        offset = Path(events_path).stat().st_size
-    except OSError:
-        offset = 0
-    _stop = _Stop(feature, Path(feature_dir), Path(events_path), offset,
-                  load_graph)
+    _stop = _Stop(feature, Path(feature_dir), Path(events_path),
+                  dt.datetime.now(dt.timezone.utc), load_graph)
 
 
 def disown_status() -> None:
@@ -318,11 +319,19 @@ def forget_run() -> None:
     _stop = None
 
 
-def _events_since(path: Path, offset: int) -> "list[dict]":
+def _event_time(event: dict) -> "dt.datetime | None":
     try:
-        with path.open("rb") as fh:
-            fh.seek(offset)
-            lines = fh.read().decode("utf-8", errors="replace").splitlines()
+        when = dt.datetime.fromisoformat(str(event.get("timestamp", "")))
+    except ValueError:
+        return None
+    return when if when.tzinfo is not None else None
+
+
+def _events_since(path: Path, started_at: "dt.datetime") -> "list[dict]":
+    """Events in *path* stamped at or after *started_at*. An event with no
+    readable timezone-aware timestamp was not written by this run."""
+    try:
+        lines = path.read_bytes().decode("utf-8", errors="replace").splitlines()
     except OSError:
         return []
     events = []
@@ -331,7 +340,10 @@ def _events_since(path: Path, offset: int) -> "list[dict]":
             event = json.loads(line)
         except ValueError:
             continue
-        if isinstance(event, dict):
+        if not isinstance(event, dict):
+            continue
+        when = _event_time(event)
+        if when is not None and when >= started_at:
             events.append(event)
     return events
 
@@ -411,7 +423,7 @@ def notify_stop(*, raised: bool, feature_arg: "str | None" = None) -> None:
     stop, _stop = _stop, None
     try:
         events = ([] if stop is None
-                  else _events_since(stop.events_path, stop.events_offset))
+                  else _events_since(stop.events_path, stop.started_at))
         reason = _stop_reason(stop, events, raised)
         feature = stop.feature if stop else (feature_arg or "")
         unit = _stop_work_unit(events)

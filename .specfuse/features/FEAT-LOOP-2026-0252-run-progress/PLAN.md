@@ -119,3 +119,10 @@ gates:
 - FEAT-LOOP-2026-0251 took seven closes because the definition of done left room for
   interpretation. `GATE-01.md` states each clause as a checkable fact; a unit that finds a
   clause ambiguous blocks and names it rather than choosing a reading.
+- **First-close follow-up (2026-11-26, #3626).** The stop reason was taken from the bytes of
+  `events.jsonl` past an offset recorded when `run()` started, before the run checks out the
+  feature branch. A checkout to a branch with a different log made an older run's escalation
+  count as this run's, or skipped this run's own lines. `notify_stop` now reads the events
+  stamped at or after the run's start time, so the branch the log came from no longer matters.
+  Tested in `TestStopNotification` with a real checkout both ways (an older escalation only on
+  the feature branch; a starting log longer than the feature branch's).

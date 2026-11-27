@@ -654,6 +654,26 @@ class _Notified:
         self.pwned = list(root.rglob("pwned"))
 
 
+def _commit(message):
+    subprocess.run(["git", "add", "."], check=True)
+    subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", message],
+                   check=True)
+
+
+def _on_feature_branch(change):
+    """Commit *change* on the fixture's feature branch, return to the
+    starting branch and leave one unrelated edit for `_Notified` to commit, so
+    the run's own checkout (and merge of the base) switches the event log."""
+    start = subprocess.run(["git", "branch", "--show-current"],
+                           capture_output=True, text=True,
+                           check=True).stdout.strip()
+    subprocess.run(["git", "checkout", "-q", "-b", f"feat/{SLUG}"], check=True)
+    change()
+    _commit("feature-branch log")
+    subprocess.run(["git", "checkout", "-q", start], check=True)
+    Path("notes.txt").write_text("unrelated\n")
+
+
 def _all_passed(fdir):
     for name, old, new in (("GATE-01.md", "open", "passed"),
                            ("PLAN.md", "active", "done")):
@@ -719,6 +739,37 @@ class TestStopNotification(unittest.TestCase):
                 "correlation_id": WU_ID, "payload": {}}) + "\n")
 
         self._assert_notified(_Notified(prepare=earlier), "stopped", "")
+
+    def test_checkout_bringing_an_older_escalation_is_not_read(self):
+        # #3626 (a): the run starts on main; the feature branch, ahead of it,
+        # holds an older escalation that the real checkout brings in.
+        def older_escalation_on_feature_branch(fdir):
+            _commit("policy")
+            _on_feature_branch(lambda: (fdir / "events.jsonl").write_text(
+                json.dumps({"timestamp": "2020-01-01T00:00:00+00:00",
+                            "event_type": "human_escalation",
+                            "correlation_id": WU_ID, "payload": {}}) + "\n"))
+
+        seen = _Notified(prepare=older_escalation_on_feature_branch)
+        self.assertEqual(seen.rc, 0, seen.output)
+        self._assert_notified(seen, "awaiting_review", WU_ID)
+
+    def test_checkout_to_a_shorter_log_still_reads_this_runs_events(self):
+        # #3626 (b): the log on main is longer than the feature branch's.
+        def longer_log_off_the_feature_branch(fdir):
+            log = fdir / "events.jsonl"
+            log.write_text("".join(
+                json.dumps({"timestamp": "2020-01-01T00:00:00+00:00",
+                            "event_type": "gate_reached",
+                            "correlation_id": FEATURE_ID,
+                            "payload": {"gate": 9, "pad": "x" * 200}}) + "\n"
+                for _ in range(20)))
+            _commit("long log")
+            _on_feature_branch(lambda: log.write_text(""))
+
+        seen = _Notified(_blocked_session,
+                         prepare=longer_log_off_the_feature_branch)
+        self._assert_notified(seen, "halted", WU_ID)
 
     def test_a_held_lock_leaves_the_other_drivers_status_alone(self):
         live = _status()
