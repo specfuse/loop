@@ -1,9 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0252/G1-CLOSE
 type: close
-status: done
-attempts: 1
-verdict: not_met
+status: pending
+attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 model: sonnet
@@ -18,7 +17,7 @@ judge_edit_acknowledged:
     - specfuse/loop/data/verification.yml.example
     - specfuse/loop/loop.py
   reason: "Driver changes reviewed and sound, accept them"
-re_arm_count: 1
+re_arm_count: 2
 re_arm_history:
   -
     timestamp: 2026-11-27T03:36:01+00:00
@@ -27,6 +26,13 @@ re_arm_history:
     prior_cost_usd: 0.0
     prior_duration_seconds: 0.0
     reason: "Driver changes reviewed and sound, accept them"
+  -
+    timestamp: 2026-11-27T04:09:24+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 1.889367
+    prior_duration_seconds: 409.775
+    reason: "Fixed the stop-reason offset, re-close it"
 cumulative_cost_usd: 0.0
 cumulative_duration_seconds: 0.0
 cumulative_input_tokens: 0
@@ -71,3 +77,11 @@ stops.
 **Escalation triggers.** A surviving skip, a notification sent more or fewer than once per stop
 in any test, or a change to `dispatch()` or the `attempt_outcome` payload: record `not_met` with
 a follow-up.
+
+**Re-close note (2026-11-26).** The first close recorded `not_met` on #3626: the stop reason was
+read from `events.jsonl` past a byte offset taken before `run()` checks out the feature branch.
+Fixed on the branch (`notify_stop` reads events stamped at or after the run's start; tests in
+`TestStopNotification` with a real checkout both ways; see `PLAN.md` Notes). That close already
+wrote `RETROSPECTIVE.md`, `FOLLOW-UPS.md`, `LEARNINGS-pending.md` and changelog fragments: update
+them in place, do not duplicate fragments, and say in `FOLLOW-UPS.md` whether #3626's re-run
+condition now holds.
