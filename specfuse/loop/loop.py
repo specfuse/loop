@@ -12703,29 +12703,6 @@ def run(
     backend = make_backend(feat_fm)
     backend.on_feature_start(feature_id, feat_fm)
 
-    # Build-pin identity (FEAT-2026-0109/T08): once per process, when this
-    # process is itself a materialized pin, record what it is actually
-    # executing — the pin's tree hash and its path — so an operator (or a
-    # test) reading events.jsonl never has to infer the build from `ps`
-    # output. The recorded path is `running_package_dir()`, the pin, never
-    # the working tree's `specfuse/loop/`.
-    if not dry_run and os.environ.get(PINNED_BUILD_ENV_VAR):
-        from specfuse.loop.build_provenance import running_package_dir
-        flush_events(events_path, [build_event(
-            "driver_build_pinned", feature_id, {
-                "tree": os.environ[PINNED_BUILD_ENV_VAR],
-                "path": str(running_package_dir()),
-            })])
-        # Committed immediately, same as the baseline-snapshot write just
-        # below: an uncommitted events.jsonl line would not survive the
-        # first WU attempt's `git reset --hard head_before` if that attempt
-        # fails.
-        commit_bookkeeping(
-            [events_path],
-            f"chore(loop): {feature_id} build pin recorded\n\n"
-            f"Feature: {feature_id}",
-        )
-
     gate = next((g for g in gates if g.status != "passed"), None)
     if gate is None:
         # Observation-only path (#276). This poll used to write PLAN.md
@@ -12799,6 +12776,31 @@ def run(
             print(f"specfuse run cannot enter the feature branch:\n{exc}",
                   file=sys.stderr)
             return 1
+        # Build-pin identity (FEAT-2026-0109/T08): once per process, when this
+        # process is itself a materialized pin, record what it is actually
+        # executing — the pin's tree hash and its path — so an operator (or a
+        # test) reading events.jsonl never has to infer the build from `ps`
+        # output. The recorded path is `running_package_dir()`, the pin, never
+        # the working tree's `specfuse/loop/`. Recorded only once the run is
+        # on the feature branch, so the commit never lands on the branch the
+        # run started from (#3628); a --prepare-only run dispatches nothing
+        # and records no pin.
+        if os.environ.get(PINNED_BUILD_ENV_VAR):
+            from specfuse.loop.build_provenance import running_package_dir
+            flush_events(events_path, [build_event(
+                "driver_build_pinned", feature_id, {
+                    "tree": os.environ[PINNED_BUILD_ENV_VAR],
+                    "path": str(running_package_dir()),
+                })])
+            # Committed immediately, same as the baseline-snapshot write just
+            # below: an uncommitted events.jsonl line would not survive the
+            # first WU attempt's `git reset --hard head_before` if that attempt
+            # fails.
+            commit_bookkeeping(
+                [events_path],
+                f"chore(loop): {feature_id} build pin recorded\n\n"
+                f"Feature: {feature_id}",
+            )
 
     try:
         if not dry_run:
