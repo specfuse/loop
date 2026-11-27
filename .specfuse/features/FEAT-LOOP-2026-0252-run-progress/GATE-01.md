@@ -3,6 +3,11 @@ gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_run_progress -v -b"
 cost_budget_usd: 18.00
+broad_run:
+  tree: 07bbf72d1e7af3c1a03af605f40e5563dc3a18db:0ec7c6da6e74f0b56753f09657b654a6d289b91b:12064a6191eeb830a9826d911a8543fbaba3da75:21853f95bd08cd0c5cd8f5fe0caad3f248ba8e72:27968248a450a842ccd187b7dce0fb0ded934866:287efde8f90320baffac08f5f3287b9456a65cb9:2e29b2f7e073a0cbe290f01d3b397e1cdd10c81c:3e6b8329522b39869d0b9caf5e22bf61f1a87ec0:42796ea0e0a6c03811b0e4bc9dbd3b5ee62dd2e4:4acc6dfc5e8cece358c167d876515eba4a39a500:6f70c7c8afa618acb6b7b66ad5b035d661250dc6:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d74b7d113b844e84f0009098f576fd28477f072d:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:f1126d17cf8e5a0a44edefbee7cb726fab9cf3a2:fa2f4f88657587b6e3b560977858810846b1d366
+  ran_at: 2026-11-27T03:34:05.038818+00:00
+  ok: true
+  failing: []
 ---
 
 # Gate 1 — a running unit's progress is visible, and the operator is notified once when the run stops
