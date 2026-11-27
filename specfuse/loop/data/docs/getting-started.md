@@ -176,6 +176,76 @@ failure evidence, up to three attempts, then the unit is escalated to
 > To run two features at once, use separate `git worktree` checkouts. `--dry-run`
 > is exempt.
 
+### Watching a run
+
+While a unit runs, the driver prints one plain line per phase change: the agent
+session starting and finishing, and each verification gate starting and then
+finishing with `PASS` or `FAIL` and its duration.
+
+```
+   [14:02:11] agent session started
+   [14:06:08] agent session finished (237.4s)
+   [14:06:08] gate tests started
+   [14:07:30] gate tests PASS (82.0s)
+```
+
+From a second terminal in the same checkout, follow along with:
+
+```bash
+specfuse-loop --watch                      # the single active feature
+specfuse-loop --watch --feature <FEAT-ID>
+```
+
+It shows the unit, attempt, phase, current gate and elapsed time. On a terminal
+it redraws one line; otherwise it prints a line only when the unit, attempt,
+phase or gate changes. It prints `no update for Ns` when the status has not been
+rewritten for three heartbeat intervals. It only reads, takes no lock, and exits
+`0` when the run stops, or `1` when there is no status file.
+
+**Status file.** `--watch` reads `<feature>/work/STATUS.json`, which is never
+committed. It holds `feature`, `wu_id`, `attempt`, `max_attempts`, `phase`
+(`agent`, `gate`, `between` or `stopped`), `gate`, `started_at`, `updated_at`,
+`elapsed_seconds`, `files_touched` and `stop_reason`. While an attempt runs the
+driver rewrites it every 30 seconds. To change the interval, set it in
+`.specfuse/verification.yml` (a positive integer; anything else means 30):
+
+```yaml
+defaults:
+  heartbeat_seconds: 10
+```
+
+### Being told when the run stops
+
+`specfuse-loop` sends one notification each time a run stops, with one of these
+reasons, the first that applies:
+
+| Reason | The run |
+|--------|---------|
+| `halted` | escalated to you |
+| `awaiting_review` | reached a gate that now awaits your review |
+| `complete` | left `PLAN.md` at `done` |
+| `error` | ended with an exception |
+| `stopped` | ended any other way |
+
+Both channels are set under `escalation` in `.specfuse/agent-policy.yml`, and
+each is used only when configured:
+
+- **Chat webhook:** `webhook_env` and `provider`. `quiet_hours` applies.
+- **Command:** `notify_command`, for example a desktop notifier. It is split
+  into an argument list and never run through a shell, and has 30 seconds. It
+  receives `SPECFUSE_STOP_REASON`, `SPECFUSE_FEATURE`, `SPECFUSE_WORK_UNIT`
+  (empty when no unit applies) and `SPECFUSE_MESSAGE` in its environment.
+  `quiet_hours` does not apply to it.
+
+```yaml
+escalation:
+  notify_command: "terminal-notifier -title specfuse -message 'run stopped'"
+```
+
+A failed notification is logged and does not change the exit code. `--dry-run`
+and `--watch` send nothing. The reason is also written to the status file's
+`stop_reason`.
+
 ## 6. The gate boundary — where you come back in
 
 A gate ends with a **closing sequence** that runs automatically: it writes a

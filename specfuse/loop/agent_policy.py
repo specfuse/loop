@@ -70,6 +70,7 @@ _REQUIRED_ESCALATION_FIELDS = ("webhook_env", "assignee", "quiet_hours", "sla_ho
 _ESCALATION_KNOWN_KEYS = frozenset(_REQUIRED_ESCALATION_FIELDS) | {
     "provider",
     "silence_hours",
+    "notify_command",
 }
 
 # An environment-variable-NAME reference, not a secret value — same shape
@@ -955,6 +956,14 @@ def _check_escalation(escalation: object) -> list[str]:
             f"ERROR: 'escalation.webhook_env' must be an "
             f"environment-variable NAME, not a value (got {webhook_env!r})"
         )
+
+    if "notify_command" in escalation:
+        notify_command = escalation["notify_command"]
+        if not isinstance(notify_command, str):
+            findings.append(
+                f"ERROR: 'escalation.notify_command' must be a string "
+                f"(got {notify_command!r})"
+            )
 
     if "provider" in escalation:
         provider = escalation["provider"]

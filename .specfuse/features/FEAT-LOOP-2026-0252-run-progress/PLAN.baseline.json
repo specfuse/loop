@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 walking skeleton: phase events, the status file and plain driver lines",
+          "id": "FEAT-LOOP-2026-0252/T01",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 heartbeat while an attempt runs",
+          "id": "FEAT-LOOP-2026-0252/T02",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T03 \u2014 `specfuse-loop --watch`",
+          "id": "FEAT-LOOP-2026-0252/T03",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T04 \u2014 one notification when the run stops, and the docs",
+          "id": "FEAT-LOOP-2026-0252/T04",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE \u2014 terminal close",
+          "id": "FEAT-LOOP-2026-0252/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

@@ -126,6 +126,11 @@
 #                               # writes a declared deliverable (a code
 #                               # generator, say): all three then run only
 #                               # after verification (FEAT-LOOP-2026-0251).
+#   heartbeat_seconds: 30       # how often the live status file
+#                               # (<feature>/work/STATUS.json) is refreshed
+#                               # while an attempt runs. 30 when missing, not
+#                               # an integer or not positive
+#                               # (FEAT-LOOP-2026-0252).
 #   dispatch_skills: false      # whether a dispatched session loads the
 #                               # project's skills index. Defaults to false:
 #                               # a work unit invokes no skill, and the index
@@ -161,6 +166,7 @@
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
 #   fail_fast_deliverables: true
+#   heartbeat_seconds: 30
 #   dispatch_skills: false
 #   post_merge_issue: false
 #   produces_amendable: false

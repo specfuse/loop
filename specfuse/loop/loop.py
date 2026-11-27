@@ -66,6 +66,7 @@ from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
 from . import criteria_state
+from . import progress as _progress
 from . import ids as _ids
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES
@@ -660,6 +661,20 @@ def resolve_fail_fast_deliverables(verification_cfg: dict) -> bool:
     """
     project = (verification_cfg or {}).get("defaults") or {}
     return bool(project.get("fail_fast_deliverables", True))
+
+
+def resolve_heartbeat_seconds(verification_cfg: dict) -> int:
+    """How often the status file is refreshed while an attempt runs
+    (FEAT-LOOP-2026-0252/T02).
+
+    Reads `defaults.heartbeat_seconds` from verification.yml. 30 when the key
+    is missing, not an integer or not positive.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    value = project.get("heartbeat_seconds")
+    if type(value) is int and value > 0:
+        return value
+    return 30
 
 
 def resolve_dispatch_skills(verification_cfg: dict) -> bool:
@@ -3123,21 +3138,49 @@ def _path_state(path: str) -> "tuple[int, str] | None":
             hashlib.sha256(data).hexdigest())
 
 
-def _paths_differing_from(head: str) -> "set[str] | None":
+def _paths_differing_from(head: str, *,
+                          env: "dict | None" = None) -> "set[str] | None":
     """Every path whose working-tree state differs from *head*: tracked
     changes, staged or not, by both their old and new names (no rename
     pairing), plus untracked files. Names are read NUL-separated, so git
-    does not quote non-ASCII ones. None on any git error."""
+    does not quote non-ASCII ones. None on any git error. *env* replaces
+    git's environment."""
     try:
         tracked = subprocess.run(
             ["git", "diff", "--no-renames", "--name-only", "-z", head],
-            capture_output=True, text=True, check=True).stdout
+            capture_output=True, text=True, check=True, env=env).stdout
         untracked = subprocess.run(
             ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-            capture_output=True, text=True, check=True).stdout
+            capture_output=True, text=True, check=True, env=env).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
     return {p for p in (tracked + untracked).split("\0") if p}
+
+
+def heartbeat_files_touched(head: str,
+                            bookkeeping: "tuple[Path, ...]") -> "list | None":
+    """`_paths_differing_from(head)` less the driver's *bookkeeping* files,
+    matched by full path. None when git cannot list the tree.
+
+    It runs beside the session and the driver, and `git diff` rewrites a stale
+    index under `index.lock`. So git reads a scratch copy of the index, and
+    their own git calls never find the lock taken by this one.
+    """
+    try:
+        index = Path(git("rev-parse", "--git-path", "index")).resolve()
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp) / "index"
+            if index.exists():
+                # copy2 keeps the mtime git's racy-index check relies on.
+                shutil.copy2(index, scratch)
+            paths = _paths_differing_from(
+                head, env={**os.environ, "GIT_INDEX_FILE": str(scratch)})
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    if paths is None:
+        return None
+    skip = {Path(p).resolve() for p in bookkeeping}
+    return sorted(p for p in paths if Path(p).resolve() not in skip)
 
 
 @dataclass(frozen=True)
@@ -5240,6 +5283,14 @@ def _untracked_file_blocks(max_chars: int) -> str:
     return "".join(blocks)
 
 
+#: The driver appends phase events to a feature's log while an attempt runs
+#: (FEAT-LOOP-2026-0252). A captured attempt diff leaves those logs out: the
+#: lines are not the agent's work, and replaying their hunk over the preserved
+#: log (`apply_diff`) would not apply.
+_DRIVER_EVENT_LOGS_EXCLUDE = (
+    f":(top,exclude,glob){FEATURES_DIR.as_posix()}/*/events.jsonl")
+
+
 def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
     """Return the working tree's departure from `head_before`, capped.
 
@@ -5260,7 +5311,8 @@ def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
     """
     try:
         out = subprocess.run(
-            ["git", "diff", head_before],
+            ["git", "diff", head_before, "--", ":(top)",
+             _DRIVER_EVENT_LOGS_EXCLUDE],
             capture_output=True, text=True, check=True,
         ).stdout
     except (subprocess.CalledProcessError, OSError):
@@ -7132,6 +7184,7 @@ def _run_gate_set(
         else:
             popen_argv = command
             popen_kwargs = dict(shell=True)  # nosec B604
+        _progress.gate_started(gate["name"])
         gate_started = time.monotonic()
         proc = subprocess.Popen(  # nosec B602
             popen_argv, stdin=subprocess.DEVNULL,
@@ -7176,6 +7229,7 @@ def _run_gate_set(
                 f"or a wedged subprocess)."
             ]
         gate_duration = round(time.monotonic() - gate_started, 3)
+        _progress.gate_finished(gate["name"], ok, gate_duration)
         if not ok:
             failed_names.add(gate["name"])
         log_path = persist_gate_output(feature_dir, gate["name"], out)
@@ -8726,11 +8780,15 @@ def execute_unit_attempt(
     worklist_section = format_reverification_worklist(wu, feature_dir)
     if worklist_section:
         wu.body = wu.body + "\n\n" + worklist_section
+    _progress.agent_session_started()
     _agent_t0 = time.monotonic()
-    if dispatch_fn is None:
-        result = dispatch(wu, failure_note, cost_tracking)
-    else:
-        result = dispatch_fn(wu, failure_note)
+    try:
+        if dispatch_fn is None:
+            result = dispatch(wu, failure_note, cost_tracking)
+        else:
+            result = dispatch_fn(wu, failure_note)
+    finally:
+        _progress.agent_session_finished()
     agent_seconds = time.monotonic() - _agent_t0
     if isinstance(result, tuple):
         stdout, usage = result
@@ -12389,6 +12447,8 @@ def run(
     _override_ns = argparse.Namespace(force_full_close=force_full_close)
     _override_active, _override_reason = resolve_auto_close_override(_override_ns, feature_dir)
     events_path = feature_dir / "events.jsonl"
+    _progress.remember_run(
+        feature_id, feature_dir, events_path, load_graph=load_graph)
     work_dir = feature_dir / "work"
     backend = make_backend(feat_fm)
     backend.on_feature_start(feature_id, feat_fm)
@@ -12445,6 +12505,7 @@ def run(
         try:
             lock_fd = acquire_tree_lock(SPECFUSE_DIR)
         except BlockingIOError:
+            _progress.disown_status()
             print(
                 "another loop driver is already running in this working tree "
                 "(.specfuse/.loop.lock held)",
@@ -12490,6 +12551,10 @@ def run(
             return 1
 
     try:
+        if not dry_run:
+            _progress.begin_run(
+                feature_id, feature_dir, events_path,
+                build_event=build_event, flush_events=flush_events)
 
         # Per-project cost-tracking toggle (top-level key in verification.yml,
         # default True). When True, the driver records cumulative cost / tokens
@@ -12610,6 +12675,7 @@ def run(
             if not pending:
                 break
             for wu in pending:  # sequential v1; the frontier is independent -> fan-out later
+                _progress.clear_unit()
                 # Per-gate cost budget brake — halt-between-WUs.
                 # Mirrors MAX_ATTEMPTS' shape (a brake, not an estimator). Fires
                 # before the next WU's set_wu(in_progress) so an in-progress WU
@@ -13042,6 +13108,7 @@ def run(
                 # MAX_ATTEMPTS. A malformed value raises here rather than
                 # silently reverting to 3.
                 wu_max_attempts = resolve_max_attempts(wu, load_verification())
+                heartbeat_seconds = resolve_heartbeat_seconds(load_verification())
                 # Convergent-iteration state (#2650); inert unless the unit
                 # opts in. `_best_diff` is the working-tree diff of the best
                 # attempt so far, replayed when a later attempt regresses so a
@@ -13116,14 +13183,22 @@ def run(
                     # What a kept earlier attempt left on disk, so this
                     # attempt's retry note lists only its own changes (#3612).
                     tree_before = snapshot_dirty_tree(head_before)
+                    _progress.begin_attempt(wu.wu_id, attempt, wu_max_attempts)
                     t0 = time.monotonic()
                     wu.last_gate_results = []
-                    outcome, payload, usage = execute_unit_attempt(
-                        wu, feature_dir, failure_note, cost_tracking=cost_tracking,
-                        head_before=head_before, prerun_cfg=cfg,
-                        gate_file=gate.file,
-                        untracked_before=untracked_before,
-                    )
+                    _progress.start_heartbeat(heartbeat_seconds, functools.partial(
+                        heartbeat_files_touched, head_before,
+                        (wu.file, events_path, feature_dir / PROGRESS_FILENAME)))
+                    try:
+                        outcome, payload, usage = execute_unit_attempt(
+                            wu, feature_dir, failure_note,
+                            cost_tracking=cost_tracking,
+                            head_before=head_before, prerun_cfg=cfg,
+                            gate_file=gate.file,
+                            untracked_before=untracked_before,
+                        )
+                    finally:
+                        _progress.stop_heartbeat()
                     wu_events.extend(build_attempt_gate_events(wu, attempt))
                     duration = round(time.monotonic() - t0, 3)
                     attempt_record: dict = {"attempt": attempt,
@@ -13146,7 +13221,7 @@ def run(
                     # as an untouched tree (FEAT-LOOP-2026-0251).
                     _refusal_touched = git_diff_names(
                         head_before, "HEAD", worktree=True,
-                        exclude=(wu.file,))
+                        exclude=(wu.file, events_path))
 
                     if outcome == "zero_token":
                         # Agent never produced output (input_tokens=0). Skip
@@ -14601,6 +14676,9 @@ def run(
         )
         return 1
     finally:
+        # Before the lock is released, so no second driver's status is
+        # overwritten.
+        _progress.end_run()
         if lock_fd is not None:
             lock_fd.close()
 
@@ -14951,6 +15029,10 @@ def main() -> int:
     ap.add_argument("--feature", help="Feature dir name or bare FEAT-ID (e.g. "
                     "FEAT-2026-0039) under .specfuse/features/ "
                     "(optional if exactly one feature is active).")
+    ap.add_argument("--watch", action="store_true",
+                    help="Follow a running driver's progress from a second "
+                    "terminal, for --feature or the single active feature. "
+                    "Reads the status file only; runs and writes nothing.")
     ap.add_argument("--dry-run", action="store_true",
                     help="Walk the current gate without dispatching or writing.")
     ap.add_argument("--force-full-close", metavar="FEATURE_ID",
@@ -14987,6 +15069,12 @@ def main() -> int:
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
 
+    # Before the build pin and auto_sync: both write, and the watcher must not.
+    if args.watch:
+        return _progress.watch(
+            find_feature(args.feature),
+            resolve_heartbeat_seconds(load_verification()))
+
     # Build-pin re-entry (FEAT-2026-0109/T08): after argparse (so `--help`
     # and a bad flag exit here, in-process, without ever touching a pin) and
     # after the FEATURES_DIR guard, but before any work that would run
@@ -15010,9 +15098,18 @@ def main() -> int:
         # the run cannot continue, so the run does not continue.
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
-               prepare=args.prepare, prepare_only=args.prepare_only,
-               no_baseline_probe=args.no_baseline_probe)
+    _progress.forget_run()
+    raised = True
+    try:
+        rc = run(args.feature, args.dry_run,
+                 force_full_close=args.force_full_close,
+                 prepare=args.prepare, prepare_only=args.prepare_only,
+                 no_baseline_probe=args.no_baseline_probe)
+        raised = False
+        return rc
+    finally:
+        if not args.dry_run:
+            _progress.notify_stop(raised=raised, feature_arg=args.feature)
 
 
 if __name__ == "__main__":

@@ -130,6 +130,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0249 | Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0249) |
 | FEAT-LOOP-2026-0250 | Record verification gate results and durations | done | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ archive](roadmap-archive.md#feat-loop-2026-0250) |
 | FEAT-LOOP-2026-0251 | Refuse a missing deliverable before the verification gates run | done | `.specfuse/features/FEAT-LOOP-2026-0251-fail-fast-deliverables/` | [→ archive](roadmap-archive.md#feat-loop-2026-0251) |
+| FEAT-LOOP-2026-0252 | Show a running unit's progress, and notify when the driver stops | done | `.specfuse/features/FEAT-LOOP-2026-0252-run-progress/` | [→ archive](roadmap-archive.md#feat-loop-2026-0252) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it

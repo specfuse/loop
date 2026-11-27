@@ -43,6 +43,28 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-loop-2026-0252"></a>
+## FEAT-LOOP-2026-0252 — Show a running unit's progress, and notify when the driver stops
+
+**Why.** Between an attempt's start line and its outcome the driver prints nothing and writes nothing to `events.jsonl`: the agent session is one blocking call, a unit's events are buffered, and gate results are written after the whole gate set. An operator report measured a median attempt of 237 s and a maximum of 2265 s over 184 attempts, and 26 runs that halted for a human with nothing telling the operator.
+
+**Goal.** Phase events (`agent_session_started`/`_finished`, `gate_started`/`_finished`) appended to `events.jsonl` as they happen; a live `<feature>/work/STATUS.json` with a heartbeat (`defaults.heartbeat_seconds`, default 30) carrying unit, attempt, phase, gate, elapsed time and files touched; one plain driver line per phase change; `specfuse-loop --watch` to follow a run from another terminal; and exactly one notification when `run()` returns, through the existing webhook and a new `escalation.notify_command`.
+
+**Shape.** One gate, four implementation units and a terminal close; `auto`.
+
+**Out of scope.** Streaming the agent session's output (tool-call counts), a `specfuse watch` alias in the umbrella CLI, a notification per event, re-pinging, and any change to `dispatch()` or the `attempt_outcome` payload.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- Run a real feature whose units take several minutes; confirm `specfuse-loop --watch` in a
+  second terminal shows the phase and gate changing and `files_touched` growing.
+- Configure `escalation.notify_command` with a desktop notifier (for example
+  `terminal-notifier -message`) and confirm exactly one notification arrives when the run halts
+  and when it completes.
+- With a chat webhook configured, confirm the stop message arrives once.
+
 <a id="feat-loop-2026-0251"></a>
 ## FEAT-LOOP-2026-0251 — Refuse a missing deliverable before the verification gates run
 
