@@ -130,7 +130,7 @@ installation a target project copies via `init.sh`.
 | FEAT-LOOP-2026-0249 | Changelog fragments: stop concurrent PRs conflicting on CHANGELOG.md | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0249) |
 | FEAT-LOOP-2026-0250 | Record verification gate results and durations | done | `.specfuse/features/FEAT-LOOP-2026-0250-gate-timings/` | [→ archive](roadmap-archive.md#feat-loop-2026-0250) |
 | FEAT-LOOP-2026-0251 | Refuse a missing deliverable before the verification gates run | done | `.specfuse/features/FEAT-LOOP-2026-0251-fail-fast-deliverables/` | [→ archive](roadmap-archive.md#feat-loop-2026-0251) |
-| FEAT-LOOP-2026-0252 | Show a running unit's progress, and notify when the driver stops | active | `.specfuse/features/FEAT-LOOP-2026-0252-run-progress/` | [→ detail](#feat-loop-2026-0252) |
+| FEAT-LOOP-2026-0252 | Show a running unit's progress, and notify when the driver stops | done | `.specfuse/features/FEAT-LOOP-2026-0252-run-progress/` | [→ archive](roadmap-archive.md#feat-loop-2026-0252) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1060,19 +1060,6 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
 
 **Status: planned.**
-
-<a id="feat-loop-2026-0252"></a>
-## FEAT-LOOP-2026-0252 — Show a running unit's progress, and notify when the driver stops
-
-**Why.** Between an attempt's start line and its outcome the driver prints nothing and writes nothing to `events.jsonl`: the agent session is one blocking call, a unit's events are buffered, and gate results are written after the whole gate set. An operator report measured a median attempt of 237 s and a maximum of 2265 s over 184 attempts, and 26 runs that halted for a human with nothing telling the operator.
-
-**Goal.** Phase events (`agent_session_started`/`_finished`, `gate_started`/`_finished`) appended to `events.jsonl` as they happen; a live `<feature>/work/STATUS.json` with a heartbeat (`defaults.heartbeat_seconds`, default 30) carrying unit, attempt, phase, gate, elapsed time and files touched; one plain driver line per phase change; `specfuse-loop --watch` to follow a run from another terminal; and exactly one notification when `run()` returns, through the existing webhook and a new `escalation.notify_command`.
-
-**Shape.** One gate, four implementation units and a terminal close; `auto`.
-
-**Out of scope.** Streaming the agent session's output (tool-call counts), a `specfuse watch` alias in the umbrella CLI, a notification per event, re-pinging, and any change to `dispatch()` or the `attempt_outcome` payload.
-
-**Status: active.**
 
 ## Notes
 

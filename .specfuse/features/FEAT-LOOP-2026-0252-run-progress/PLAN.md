@@ -5,7 +5,7 @@ slug: run-progress
 branch: feat/FEAT-LOOP-2026-0252-run-progress
 roadmap_goal: While `specfuse-loop` runs, an operator can see which unit, attempt, phase and verification gate is running and for how long, from the driver's terminal or a second one, and is notified once when the run stops.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 14.50
 ---
 

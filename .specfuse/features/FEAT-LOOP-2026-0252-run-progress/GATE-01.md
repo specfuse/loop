@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 feature_oracle: "python3 -m unittest tests.test_run_progress -v -b"
 cost_budget_usd: 18.00
 broad_run:
