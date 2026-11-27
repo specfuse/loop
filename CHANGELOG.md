@@ -26,6 +26,44 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.34.0+umbrella.0.17.0] - 2026-11-27
+
+### Fixed
+
+- The terminal judge-editing stop also applies the judge-path registry of the tree being closed (when it has one), so a module a gate unit adds to JUDGE_MODULES is caught even though the running build was pinned before that edit. (#3551)
+- A re-armed unit whose new cycle ends blocked or fails an attempt no longer loses the prior cycle from its lifetime cost: the re-arm fold is committed before the attempt starts, so the attempt reset cannot erase it. (#3552)
+- `specfuse stats` now reports on the repository it is run in, instead of refusing the default `--roots .` as the wrong depth (#3596)
+- specfuse run no longer cuts a missing feature branch from a base that lacks the feature folder and then crashes; it refuses before switching branches and says how to proceed. (#3601)
+- A work unit left `in_progress` by a killed run is now reset to `pending` and dispatched by the next `specfuse run`, instead of halting the gate until the operator resets it by hand. (#3602)
+- A gate that exits non-zero without a recognised pass/fail summary is now reported with its exit code, and failure_excerpt carries the command's own last lines instead of a "NO VERDICT FOUND ... may be unrelated" note. (#3603)
+- The produced-document verdict guard now also catches a blocking verdict on an Outcome, Result, Status or Conclusion line (any emphasis, uppercase token), not only a Verdict line, and ignores lines inside code fences. (#3607)
+- specfuse monitor no longer reopens a closed finding whose harvested occurrences all predate the close; the reopen comment names the latest occurrence instead of the run time. (#3615)
+- A guard refusal that keeps the tree no longer crashes the driver when the attempt created a file with a non-ASCII name: untracked paths are read NUL-separated, so git no longer receives a quoted name. (#3616)
+- A FOLLOW-UPS.md section heading that groups nested #### entries is no longer filed as a follow-up issue of its own. (#3622)
+- A pinned driver run started on another branch (with or without --prepare) no longer commits its build-pin record there: the record is written once the run is on the feature branch, and a --prepare-only run records none. (#3628)
+
+### Changed
+
+- A terminal close whose judge gives no verdict (timed out, could not run, unreadable output, or a defect in its path) no longer finishes the feature on its own met: the terminal flips are withheld and the run halts with judge_unavailable_terminal. The judge timeout is now 30 minutes. (#3620)
+- The `produces_not_in_diff`, `deliverable_missing` and `no_deliverable_files` refusals now run before the verification gates, so a refused attempt pays for no gate run. An attempt that also would have failed a gate, `files_changed_mismatch`, the smoke-import check, a closing-deliverable guard, the blocked-verdict check, the squash commit or any other check that runs after the agent session is now reported as the deliverable refusal instead. By default such an attempt keeps its working tree (`defaults.retain_on_guard_refusal`), even where the other refusal would have reset it (FEAT-LOOP-2026-0251)
+- The retry note for the three deliverable refusals now lists the paths the attempt changed (at most 20, plus a count of the rest), or says it changed none. Edits kept from an earlier attempt that this attempt did not touch are not listed; deletes, reverts, both names of a rename, mode-only changes and non-ASCII names are. Not listed: files git ignores, and the driver's own unit file, `events.jsonl` and `PROGRESS.md` in the feature folder (FEAT-LOOP-2026-0251)
+
+### Added
+
+- `attempt_outcome` payloads gain `agent_seconds` and `verify_seconds`, splitting an attempt's time between the agent session and verification; `duration_seconds` keeps its meaning (FEAT-LOOP-2026-0250)
+- New driver event type `gate_result` (registered in `driver-event.schema.json`): one per gate per run, carrying `attempt`, `gate`, `ok`, `skipped`, `duration_seconds` and `phase` (`attempt`, `baseline` or `broad`) (FEAT-LOOP-2026-0250)
+- `specfuse stats` reports the agent/verify split per feature and the slowest gates (runs, total, median, max seconds), in text and in `--json` as `time_split` and `gate_timings`; a corpus with no such events reads `not recorded` (FEAT-LOOP-2026-0250)
+- `defaults.fail_fast_deliverables` in `verification.yml` (default `true`); set `false` to run the three deliverable refusals after verification, as before. Needed when a verification gate itself writes a declared deliverable (FEAT-LOOP-2026-0251)
+- `specfuse lint` prints a WARN for a dispatchable work unit whose `produces:` path its body never mentions by full path, file name or parent directory (FEAT-LOOP-2026-0251)
+- `specfuse-loop --watch [--feature F]` follows a running driver from a second terminal; it only reads the status file, exits 0 when the run stops and 1 when there is no status file (FEAT-LOOP-2026-0252)
+- The driver prints one plain line per phase change (agent session started and finished, each gate started and finished with result and duration) and appends `agent_session_started`, `agent_session_finished`, `gate_started` and `gate_finished` to `events.jsonl` as they happen. `events.jsonl` line order is no longer guaranteed to be timestamp order, because a unit's buffered events are still written later (FEAT-LOOP-2026-0252)
+- When a `specfuse-loop` run ends (not under `--dry-run`), it sends one notification to the configured escalation webhook and to the new `escalation.notify_command` in `agent-policy.yml`, with the stop reason in the message and in `SPECFUSE_STOP_REASON`. The command runs without a shell, with a 30 s timeout, and its failure does not change the exit code (FEAT-LOOP-2026-0252)
+- While a feature runs, the driver keeps `<feature>/work/STATUS.json` (never committed) with the unit, attempt, phase, gate, elapsed time and files touched, refreshed during an attempt every `defaults.heartbeat_seconds` in `verification.yml` (default 30) (FEAT-LOOP-2026-0252)
+- A `gate_result` event for a reused gate result carries `cached: true` and `duration_seconds: 0`; the field is absent for a gate that ran. (FEAT-LOOP-2026-0253)
+- New opt-in key `defaults.max_parallel` in verification.yml (integer >= 1, default 1): above 1, gates of one set whose `needs:` are met run concurrently and results keep the order of the set; any other value is a CONFIGURATION ERROR. (FEAT-LOOP-2026-0253)
+- New opt-in per-gate key `inputs:` (git pathspec globs): the per-attempt verify reuses the earlier PASS of that gate, reported `PASS (cached)`, while its command and matching files are unchanged; the broad run, baseline probe, feature_oracle and any gate another gate needs always run fresh. An `inputs:` that is not a non-empty list of non-empty strings is a CONFIGURATION ERROR. (FEAT-LOOP-2026-0253)
+- `work/STATUS.json` gains `gates_running`, the names of the gates running now in start order (`[]` when none); with parallel gates, `gate` is the most recently started one still running. (FEAT-LOOP-2026-0253)
+
 ## [0.33.2+umbrella.0.17.0] - 2026-11-16
 
 ### Fixed
