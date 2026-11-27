@@ -396,6 +396,30 @@ class TestTitlesTrackingAndBoundaries(unittest.TestCase):
             self.assertEqual(text.count("Tracked as"), 2, "the hand-written line is left alone")
             self.assertIn("## Discharged at this close", text, "nothing below the entries is rewritten")
 
+    def test_a_grouping_heading_over_nested_entries_is_not_filed(self):
+        # #3622: a `###` heading that groups `####` entries (here, entries
+        # already resolved and tracked) was filed as a new follow-up issue.
+        text = (
+            "# Follow-ups — FEAT-9999\n\nNo entry is open.\n\n"
+            "## Resolved\n\n#### Entry A\n\n**Tracked as #1.** holds.\n\n"
+            "### Resolved at earlier closes\n\nThe text below is as the "
+            "sixth close wrote it.\n\n#### Entry B\n\n**Tracked as #2.** "
+            "holds.\n\n### A real open finding\n\n**Evidence.** stub\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)
+            _write_plan(feature_dir)
+            (feature_dir / "FOLLOW-UPS.md").write_text(text)
+            runner = _FakeGhRunner()
+            result = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            titles = [c[c.index("--title") + 1] for c in runner.create_calls]
+            self.assertEqual(titles, ["[FEAT-9999 follow-up] A real open finding"])
+            self.assertEqual(result["filed"], 1)
+            self.assertNotIn(
+                "Tracked as", (feature_dir / "FOLLOW-UPS.md").read_text().split(
+                    "### Resolved at earlier closes")[1].split("#### Entry B")[0],
+                "the grouping heading gets no tracked line")
+
     def test_post_merge_checklist_gets_a_named_title_and_a_tracked_line(self):
         with tempfile.TemporaryDirectory() as tmp:
             feature_dir = Path(tmp)
