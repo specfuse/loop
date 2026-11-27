@@ -114,6 +114,51 @@ class TestProducedDocumentVerdictGuard(unittest.TestCase):
         outcome, _, _ = self._attempt(wu)
         self.assertEqual(outcome, "passed")
 
+    def test_bold_outcome_line_fires(self):
+        # #3607: the generator's evidence file, verbatim shape.
+        doc = self.feature_dir / "EVIDENCE-consumer-validation.md"
+        doc.write_text(
+            "# FEAT-2026-9999/T05 — consumer validation evidence\n\n"
+            "**Outcome: BLOCKED.** `acme_widget_app` needs one edit that no "
+            "recipe step describes.\n"
+            "`gatecheck.py --in-loop --forbid-no-changes` exits 1.\n"
+        )
+        wu = _make_wu("implementation", [str(doc)])
+        outcome, payload, _ = self._attempt(wu)
+        self.assertEqual(outcome, "failed")
+        self.assertIn("**Outcome: BLOCKED.**", payload)
+
+    def test_each_widened_label_fires(self):
+        for label in ("Outcome", "Result", "Status", "Conclusion",
+                      "*Result*", "__Status__"):
+            for token in ("BLOCKED", "NOT MET", "INCOMPLETE", "NOT SHIPPABLE"):
+                with self.subTest(label=label, token=token):
+                    doc = self.feature_dir / "E.md"
+                    doc.write_text(f"# Evidence\n\n{label}: {token} — why\n")
+                    wu = _make_wu("implementation", [str(doc)])
+                    outcome, _, _ = self._attempt(wu)
+                    self.assertEqual(outcome, "failed")
+
+    def test_widened_labels_need_an_uppercase_token(self):
+        # Ordinary prose that happens to start with one of the new labels.
+        doc = self.feature_dir / "E.md"
+        doc.write_text(
+            "# Evidence\n\nStatus: incomplete migrations are listed below.\n"
+            "Result: blocked requests are retried.\n\n## Verdict: SHIPPABLE\n")
+        wu = _make_wu("implementation", [str(doc)])
+        outcome, _, _ = self._attempt(wu)
+        self.assertEqual(outcome, "passed")
+
+    def test_lines_inside_a_code_fence_do_not_fire(self):
+        doc = self.feature_dir / "E.md"
+        doc.write_text(
+            "# Evidence\n\n```\nStatus: BLOCKED\n# BLOCKED by upstream\n"
+            "Verdict: NOT MET\n```\n\n~~~text\nOutcome: BLOCKED\n~~~\n\n"
+            "## Verdict: SHIPPABLE\n")
+        wu = _make_wu("implementation", [str(doc)])
+        outcome, _, _ = self._attempt(wu)
+        self.assertEqual(outcome, "passed")
+
     def test_a_close_unit_is_exempt(self):
         retro = self.feature_dir / "RETROSPECTIVE.md"
         retro.write_text("# Retro\n\n## Verdict\n\nverdict: not_met\n\n"
