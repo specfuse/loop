@@ -375,6 +375,17 @@ def _seen_epoch(text: Optional[str]) -> Optional[float]:
         return None
 
 
+def _closed_epoch(closed_at: Optional[str]) -> Optional[float]:
+    """Epoch seconds for a listing row's `closedAt`, or None (never raises)."""
+    if not closed_at:
+        return None
+    try:
+        return datetime.fromisoformat(
+            str(closed_at).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
 def record_finding(
     fingerprint: str,
     artifact: FailureArtifact,
@@ -451,6 +462,14 @@ def record_finding(
     if str(existing.get("state", "OPEN")).upper() == "CLOSED":
         if ids and not unseen:
             return number
+        # Reopen only for an occurrence after the close (#3615). A harvest
+        # window can reach back before it; rows with no timestamp keep the
+        # old behaviour, and a new dead-lettered message id always reopens.
+        latest = _seen_epoch(seen.last) if seen is not None else None
+        closed_at = _closed_epoch(existing.get("closedAt"))
+        if (not unseen and latest is not None and closed_at is not None
+                and latest <= closed_at):
+            return number
         occurrences = meta.occurrences + 1 if meta is not None else 1
         runner(["gh", "issue", "reopen", number, "--repo", repo], check=True)
         runner(
@@ -460,7 +479,8 @@ def record_finding(
                 "--body",
                 f"{REOPENED_MARKER}\n"
                 f"Recurred after close: occurrence {occurrences}, "
-                f"first seen {_iso(first_seen)}, last seen {_iso(now)}."
+                f"first seen {_iso(first_seen)}, "
+                f"last seen {_iso(latest if latest is not None else now)}."
                 + (f" New dead-lettered message: {', '.join(unseen)}." if unseen else ""),
             ],
             check=True,
