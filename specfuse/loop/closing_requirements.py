@@ -67,6 +67,15 @@ FOLLOW_UP_LABEL = "specfuse:follow-up"
 POST_MERGE_LABEL = "specfuse:post-merge"
 
 
+FOLLOW_UP_NESTED_HEADING_RE = re.compile(r"^#{4,6}\s", re.MULTILINE)
+
+
+def is_followup_grouping(entry: str) -> bool:
+    """True when a `### ` entry holds `####` (or deeper) headings: it groups
+    entries rather than naming one, and is not a follow-up to file (#3622)."""
+    return bool(FOLLOW_UP_NESTED_HEADING_RE.search(entry))
+
+
 def parse_followup_entries(text: str) -> list[str]:
     """Split `FOLLOW-UPS.md` into its `### `-headed entry bodies, in order.
 

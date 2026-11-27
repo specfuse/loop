@@ -100,6 +100,7 @@ from .closing_requirements import (
     find_post_merge_checklist_section,
     gate_review_filename,
     gate_section_heading_re,
+    is_followup_grouping,
     learnings_staging_is_required,
     parse_followup_entries,
 )
@@ -10828,6 +10829,8 @@ def file_followup_issues(
     followups_path = feature_dir / FOLLOW_UPS_FILENAME
     if followups_path.exists():
         for entry in parse_followup_entries(followups_path.read_text()):
+            if is_followup_grouping(entry):
+                continue  # a section over nested entries, not a finding (#3622)
             # #3253: keyed by the entry's heading, not its position, so a
             # later close attempt's new finding files a new issue and a
             # repeated finding still finds the one already filed.
